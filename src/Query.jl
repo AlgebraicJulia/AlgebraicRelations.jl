@@ -3,7 +3,7 @@ module QueryLib
 export Ports, Query, make_query,
   Ob, Hom, dom, codom, compose, ⋅, ∘, id, otimes, ⊗, munit, braid, σ,
   dagger, dunit, dcounit, mcopy, Δ, delete, ◊, mmerge, ∇, create, □,
-  meet, top, to_sql, FreeBicategoryRelations
+  meet, top, FreeBicategoryRelations
   #, plus, zero, coplus, cozero,  join, bottom
 
 using Catlab, Catlab.Doctrines, Catlab.Present, Catlab.WiringDiagrams
@@ -14,7 +14,8 @@ import Catlab.Doctrines:
   FreeBicategoryRelations
 
 using AutoHashEquals
-import Schema.Presentation: Schema, TypeToSql
+
+import AlgebraicRelations.Presentation: Schema
 
 @auto_hash_equals struct Types
   ports::Ports
@@ -25,16 +26,11 @@ end
 This structure holds the relationship graph between fields in a query
 
 # Fields
-- `dom::Types`: the types of the columns in the domain
-- `codom::Types`: the types of the columns in the codomain
-- `dom_names::Array{Int,1}`: index of the domain fields
-- `codom_names::Array{Int,1}`: index of the codomain fields
-- `tables::Array{String,1}`: Names of the tables included in the relationship
-                             graph
-- `fields::Array{Tuple{Int,String},1}`: Connection between a table and its
-                                        fields
-- `edges::Array{Tuple{Int,Int},1}`: Equality relationship between fields of
-                                    tables
+- `tables::Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}}`:
+          The mapping between a table symbols and their column names for domain
+          and codomain.
+- `wd::WiringDiagram`: The wiring diagram which holds the relational 
+                       information for the query.
 """
 struct Query
   tables::Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}}
@@ -44,132 +40,6 @@ end
 Query(wd::WiringDiagram)::Query = begin
   n_table = Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}}()
   Query(n_table, wd)
-end
-
-struct Vertex
-  name::Symbol
-  is_dagger::Bool
-  is_junc::Bool
-end
-
-function to_sql(q::Query)::String
-
-  ind_to_alias(i) = "t$i"
-  wd = q.wd
-  tables = q.tables
-
-  # Get the vertices as (name, is_dagger, is_junc)
-  verts = fill(Vertex(:*,false,false),nboxes(wd)+2)
-  verts[1] = Vertex(:input,false,true)
-  verts[2] = Vertex(:output,false,true)
-
-  for k in box_ids(wd)
-    v = box(wd, k)
-
-    is_junc   = false
-    is_dagger = false
-    name      = :*
-    if typeof(v) <: Junction
-      is_junc = true
-    elseif typeof(v) <: BoxOp{:dagger}
-      is_dagger = true
-      name = v.box.value
-    else
-      name = v.value
-    end
-    verts[k] = Vertex(name, is_dagger, is_junc)
-  end
-
-  # Make the join statement
-  alias_array = Array{String,1}()
-  for v in box_ids(wd)
-    cur_b = verts[v]
-    name = string(cur_b.name)
-    if !cur_b.is_junc
-      push!(alias_array, "$name AS $(ind_to_alias(v))")
-    end
-  end
-
-  # Make the relation statement
-  relation_array = Array{String,1}()
-
-  # Neighbors will keep track of connections to junction nodes
-  neighbors = fill((Array{String,1}(),Array{String,1}()), length(verts))
-
-  neighbors[1] = (Array{String,1}(),fill("", length(wd.input_ports)))
-  neighbors[2] = (fill("", length(wd.output_ports)),Array{String,1}())
-  for i in 3:length(neighbors)
-    if verts[i].is_junc
-      neighbors[i] = ([""],[""])
-    else
-      neighbors[i] = (fill("",length(tables[verts[i].name][1])),
-                      fill("",length(tables[verts[i].name][2])))
-    end
-  end
-
-  for e in wires(wd)
-    sb = e.source.box
-    sp = e.source.port
-    db = e.target.box
-    dp = e.target.port
-    src = ""
-    dst = ""
-
-    if verts[sb].is_junc && verts[db].is_junc
-      continue
-    elseif verts[sb].is_junc
-      df = tables[verts[db].name][1][dp]
-      if verts[db].is_dagger
-        df = tables[verts[db].name][2][dp]
-      end
-      if neighbors[sb][2][sp] == ""
-        neighbors[sb][2][sp] = "$(ind_to_alias(db)).$df"
-        continue
-      else
-        src = neighbors[sb][2][sp]
-        dst = "$(ind_to_alias(db)).$df"
-      end
-    elseif verts[db].is_junc
-      sf = tables[verts[sb].name][2][sp]
-      if verts[sb].is_dagger
-        sf = tables[verts[sb].name][1][sp]
-      end
-      if neighbors[db][1][dp] == ""
-        neighbors[db][1][dp] = "$(ind_to_alias(sb)).$sf"
-        continue
-      else
-        src = neighbors[db][1][dp]
-        dst = "$(ind_to_alias(sb)).$sf"
-      end
-    else
-      sf = tables[verts[sb].name][2][sp]
-      if verts[sb].is_dagger
-        sf = tables[verts[sb].name][1][sp]
-      end
-      src = "$(ind_to_alias(sb)).$sf"
-
-      df = tables[verts[db].name][1][dp]
-      if verts[db].is_dagger
-        df = tables[verts[db].name][2][dp]
-      end
-      dst = "$(ind_to_alias(db)).$df"
-    end
-
-    if dst*"="*src in relation_array || src*"="*dst in relation_array
-      continue
-    end
-    push!(relation_array, src*"="*dst)
-  end
-
-  # The only important junction nodes are the input/output nodes
-  dom_array = neighbors[1][2]
-  codom_array = neighbors[2][1]
-
-  select = "SELECT "*join(vcat(dom_array, codom_array), ", ")*"\n"
-  from = "FROM "*join(alias_array, ", ")*"\n"
-  condition = "WHERE "*join(relation_array, " AND ")*";"
-
-  return select*from*condition
 end
 
 @instance BicategoryRelations(Types, Query) begin
@@ -236,7 +106,7 @@ end
   end
 end
 
-make_query(s::Schema, q::GATExpr)::Query = begin
+Query(s::Schema, q::GATExpr)::Query = begin
 
   # Keep the type names associated to consistent Types objects
   new_type = Dict{FreeBicategoryRelations.Ob,FreeBicategoryRelations.Ob}()
@@ -303,4 +173,11 @@ make_query(s::Schema, q::GATExpr)::Query = begin
   end
   functor((Types, Query), q, generators=d)
 end
+
+# Define a query based off of a formula and a table of column names
+Query(tables::Dict{Symbol, Tuple{Array{String,1},Array{String,1}}}, 
+      q::GATExpr) = begin
+  Query(tables, to_wiring_diagram(q))
+end
+
 end

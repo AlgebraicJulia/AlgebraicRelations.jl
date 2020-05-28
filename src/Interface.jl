@@ -2,12 +2,10 @@ module Interface
   export init_tables, prepare, execute, Connection, format_form 
 
   using Catlab
-  using Schema.Presentation, Schema.QueryLib
+  using AlgebraicRelations.Presentation, AlgebraicRelations.QueryLib, AlgebraicRelations.SQL
   using LibPQ, DataFrames
   import LibPQ:
     Connection, Result, Statement
-  import Schema.Presentation:
-    Schema, sql
 
 
   function init_tables(conn::Connection, schema::Schema)
