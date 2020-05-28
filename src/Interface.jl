@@ -2,7 +2,7 @@ module Interface
   export init_tables, prepare, execute, Connection, format_form 
 
   using Catlab
-  using AlgebraicRelations.Presentation, AlgebraicRelations.QueryLib, AlgebraicRelations.SQL
+  using AlgebraicRelations.SchemaLib, AlgebraicRelations.QueryLib, AlgebraicRelations.SQL
   using LibPQ, DataFrames
   import LibPQ:
     Connection, Result, Statement

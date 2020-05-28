@@ -3,10 +3,12 @@ module QueryLib
 export Ports, Query, make_query,
   Ob, Hom, dom, codom, compose, ⋅, ∘, id, otimes, ⊗, munit, braid, σ,
   dagger, dunit, dcounit, mcopy, Δ, delete, ◊, mmerge, ∇, create, □,
-  meet, top, FreeBicategoryRelations
+  meet, top, FreeBicategoryRelations, to_presentation, draw_query
   #, plus, zero, coplus, cozero,  join, bottom
 
-using Catlab, Catlab.Doctrines, Catlab.Present, Catlab.WiringDiagrams
+using Catlab, Catlab.Doctrines, Catlab.Present,
+      Catlab.WiringDiagrams, Catlab.Graphics,
+      Catlab.Graphics.Graphviz
 import Catlab.Doctrines:
   Ob, Hom, dom, codom, compose, ⋅, ∘, id, otimes, ⊗, munit, braid, σ,
   dagger, dunit, dcounit, mcopy, Δ, delete, ◊, mmerge, ∇, create, □,
@@ -15,7 +17,7 @@ import Catlab.Doctrines:
 
 using AutoHashEquals
 
-import AlgebraicRelations.Presentation: Schema
+import AlgebraicRelations.SchemaLib: Schema
 
 @auto_hash_equals struct Types
   ports::Ports
@@ -29,7 +31,7 @@ This structure holds the relationship graph between fields in a query
 - `tables::Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}}`:
           The mapping between a table symbols and their column names for domain
           and codomain.
-- `wd::WiringDiagram`: The wiring diagram which holds the relational 
+- `wd::WiringDiagram`: The wiring diagram which holds the relational
                        information for the query.
 """
 struct Query
@@ -175,9 +177,22 @@ Query(s::Schema, q::GATExpr)::Query = begin
 end
 
 # Define a query based off of a formula and a table of column names
-Query(tables::Dict{Symbol, Tuple{Array{String,1},Array{String,1}}}, 
+Query(tables::Dict{Symbol, Tuple{Array{String,1},Array{String,1}}},
       q::GATExpr) = begin
-  Query(tables, to_wiring_diagram(q))
+  Query(tables, rem_junctions(to_wiring_diagram(q)))
+end
+
+# Generate a Catlab Presentation from homs and obs
+to_presentation(types::Array{<:GATExpr{:generator},1},
+                tables::Array{<:GATExpr{:generator},1})::Presentation = begin
+  p = Presentation()
+  add_generators!(p, types)
+  add_generators!(p, tables)
+  return p
+end
+
+draw_query(q::Query)::Graph = begin
+  to_graphviz(q.wd, orientation=LeftToRight, labels=true)
 end
 
 end

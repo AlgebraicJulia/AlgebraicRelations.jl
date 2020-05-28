@@ -1,8 +1,8 @@
 module SQL
 export sql, TypeToSql
 using Catlab.Doctrines, Catlab.Present, Catlab.WiringDiagrams
-using AlgebraicRelations.QueryLib, AlgebraicRelations.Presentation
-import AlgebraicRelations.Presentation: Schema
+using AlgebraicRelations.QueryLib, AlgebraicRelations.SchemaLib
+import AlgebraicRelations.SchemaLib: Schema
 
 TypeToSql = Dict(String => "text",
                  Int64 => "int",

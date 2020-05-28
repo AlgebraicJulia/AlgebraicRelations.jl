@@ -1,4 +1,4 @@
-module Presentation
+module SchemaLib
 export Schema
 
 struct Schema{T, U}
