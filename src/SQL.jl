@@ -56,7 +56,7 @@ g
   end
 
   # Evaluate all junction boxes
-  junction_edges = filter(e -> (e.source.box in junction_ids ||g
+  junction_edges = filter(e -> (e.source.box in junction_ids ||
                                 e.target.box in junction_ids), wires(wd))
   fill_junc!(p::Array{Array{String,1},1}, val::String) = begin
     p[1] = fill(val, length(p[1]))
