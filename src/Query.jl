@@ -35,13 +35,16 @@ This structure holds the relationship graph between fields in a query
                        information for the query.
 """
 struct Query
+  types::Dict{Symbol, Tuple{Array{String,1}, Array{DataType,1}}}
   tables::Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}}
   wd::WiringDiagram
+  Query(types, tables, wd) = new(types, tables, merge_junctions(wd))
 end
 
 Query(wd::WiringDiagram)::Query = begin
+  n_types = Dict{Symbol, Tuple{Array{String,1}, Array{<:Type,1}}}()
   n_table = Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}}()
-  Query(n_table, wd)
+  Query(n_types, n_table, wd)
 end
 
 @instance BicategoryRelations(Types, Query) begin
@@ -51,19 +54,22 @@ end
   munit(::Type{Types}) = Types(Ports([]))
 
   compose(f::Query, g::Query) = begin
+    n_types = merge(f.types, g.types)
     n_tables = merge(f.tables, g.tables)
     n_wd = compose(f.wd, g.wd)
-    return Query(n_tables, n_wd)
+    return Query(n_types, n_tables, n_wd)
   end
 
   otimes(A::Types, B::Types) = Types(otimes(A.ports,B.ports))
   otimes(f::Query, g::Query) = begin
+    n_types = merge(f.types, g.types)
     n_tables = merge(f.tables, g.tables)
     n_wd = otimes(f.wd, g.wd)
     return Query(n_tables, n_wd)
   end
 
   meet(f::Query, g::Query) = begin
+    n_types = merge(f.types, g.types)
     n_tables = merge(f.tables, g.tables)
     n_wd = meet(f.wd, g.wd)
     return Query(n_tables, n_wd)
@@ -108,6 +114,28 @@ end
   end
 end
 
+# Define a query based off of a formula and a table of column names
+Query(types::Dict{Symbol, Tuple{Array{T,1} where T, Array{DataType,1}}},
+      tables::Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}},
+      q::GATExpr) = begin
+  Query(types, tables, to_wiring_diagram(q))
+end
+
+# Generate a Catlab Presentation from homs and obs
+to_presentation(types::Array{<:GATExpr{:generator},1},
+                tables::Array{<:GATExpr{:generator},1})::Presentation = begin
+  p = Presentation()
+  add_generators!(p, types)
+  add_generators!(p, tables)
+  return p
+end
+
+# Draw a query wiring diagram
+draw_query(q::Query)::Graph = begin
+  to_graphviz(q.wd, orientation=LeftToRight, labels=true)
+end
+
+#=
 Query(s::Schema, q::GATExpr)::Query = begin
 
   # Keep the type names associated to consistent Types objects
@@ -175,24 +203,5 @@ Query(s::Schema, q::GATExpr)::Query = begin
   end
   functor((Types, Query), q, generators=d)
 end
-
-# Define a query based off of a formula and a table of column names
-Query(tables::Dict{Symbol, Tuple{Array{String,1},Array{String,1}}},
-      q::GATExpr) = begin
-  Query(tables, rem_junctions(to_wiring_diagram(q)))
-end
-
-# Generate a Catlab Presentation from homs and obs
-to_presentation(types::Array{<:GATExpr{:generator},1},
-                tables::Array{<:GATExpr{:generator},1})::Presentation = begin
-  p = Presentation()
-  add_generators!(p, types)
-  add_generators!(p, tables)
-  return p
-end
-
-draw_query(q::Query)::Graph = begin
-  to_graphviz(q.wd, orientation=LeftToRight, labels=true)
-end
-
+=#
 end

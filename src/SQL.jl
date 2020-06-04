@@ -1,5 +1,5 @@
 module SQL
-export sql, TypeToSql
+export sql, present_sql, TypeToSql
 using Catlab.Doctrines, Catlab.Present, Catlab.WiringDiagrams
 using AlgebraicRelations.QueryLib, AlgebraicRelations.SchemaLib
 import AlgebraicRelations.SchemaLib: Schema
@@ -8,135 +8,130 @@ TypeToSql = Dict(String => "text",
                  Int64 => "int",
                  Float64 => "float4")
 
-struct Vertex
-  name::Symbol
-  is_dagger::Bool
-  is_junc::Bool
+function evaluate_ports(q::Query)
+  wd = q.wd
+  tables = q.tables
+  aliases = Array{String,1}()
+  port_val = [[Array{String,1}(), Array{String,1}()] for i in 1:(length(box_ids(wd))+2)]
+
+  # Fill in this mapping for junction boxes
+  junction_ids = filter(v -> box(wd,v) isa Junction, box_ids(wd))
+  for id in junction_ids
+    cur_box = box(wd, id)
+    port_val[id][1] = fill("*", length(cur_box.input_ports))
+    port_val[id][2] = fill("*", length(cur_box.output_ports))
+  end
+
+  # Fill in this mapping for I/O boxes
+  port_val[1][2] = fill("*", length(wd.input_ports))
+  port_val[2][1] = fill("*", length(wd.output_ports))
+  append!(junction_ids, [1,2])
+
+  # Fill in this mapping for all non-junction boxes
+  rel_ids = filter(x -> !(x in junction_ids), box_ids(wd))
+  for id in rel_ids
+    cur_box = box(wd, id)
+    is_dagger = false
+    if cur_box isa BoxOp{:dagger}
+      cur_box = cur_box.box
+      is_dagger = true
+    end
+    box_name = cur_box.value
+g
+    # Push table name to the total join statement and assign an alias
+    push!(aliases, "$box_name AS t$id")
+
+    # Set the dom/codom field names
+    port_val[id][1] = map(1:length(cur_box.input_ports)) do port
+                        "t$id."*tables[box_name][1][port]
+                      end
+    port_val[id][2] = map(1:length(cur_box.input_ports)) do port
+                        "t$id."*tables[box_name][2][port]
+                      end
+    if is_dagger
+      tmp = port_val[id][1]
+      port_val[id][1] = port_val[id][2]
+      port_val[id][2] = tmp
+    end
+  end
+
+  # Evaluate all junction boxes
+  junction_edges = filter(e -> (e.source.box in junction_ids ||g
+                                e.target.box in junction_ids), wires(wd))
+  fill_junc!(p::Array{Array{String,1},1}, val::String) = begin
+    p[1] = fill(val, length(p[1]))
+    p[2] = fill(val, length(p[2]))
+  end
+  # Each iteration will evaluate at least one more edge (if there are any left)
+  for iter in 1:length(junction_edges)
+    for e in junction_edges
+      sb = e.source.box
+      sp = e.source.port
+      tb = e.target.box
+      tp = e.target.port
+      # Assign a value to a "*" if what it's connected to is defined
+      if port_val[sb][2][sp] == "*" && port_val[tb][1][tp] != "*"
+        port_val[sb][2][sp] = port_val[tb][1][tp]
+        if sb > 2
+          fill_junc!(port_val[sb], port_val[sb][2][sp])
+        end
+      elseif port_val[tb][1][tp] == "*" && port_val[sb][2][sp] != "*"
+        port_val[tb][1][tp] = port_val[sb][2][sp]
+        if tb > 2
+          fill_junc!(port_val[tb], port_val[tb][1][tp])
+        end
+      end
+    end
+  end
+g
+  aliases, port_val
 end
+
 
 function sql(q::Query)::String
 
-  ind_to_alias(i) = "t$i"
-  wd = q.wd
   tables = q.tables
+  wd = q.wd
 
-  # Get the vertices as (name, is_dagger, is_junc)
-  verts = fill(Vertex(:*,false,false),nboxes(wd)+2)
-  verts[1] = Vertex(:input,false,true)
-  verts[2] = Vertex(:output,false,true)
+  rel_statement = Array{String,1}()
 
-  for k in box_ids(wd)
-    v = box(wd, k)
+  # Define a mapping from port to field name
+  # This will have the format port_val[box][dom/cod][port] = String
+  join_statement, port_val = evaluate_ports(q)
 
-    is_junc   = false
-    is_dagger = false
-    name      = :*
-    if typeof(v) <: Junction
-      is_junc = true
-    elseif typeof(v) <: BoxOp{:dagger}
-      is_dagger = true
-      name = v.box.value
-    else
-      name = v.value
-    end
-    verts[k] = Vertex(name, is_dagger, is_junc)
-  end
-
-  # Make the join statement
-  alias_array = Array{String,1}()
-  for v in box_ids(wd)
-    cur_b = verts[v]
-    name = string(cur_b.name)
-    if !cur_b.is_junc
-      push!(alias_array, "$name AS $(ind_to_alias(v))")
-    end
-  end
-
-  # Make the relation statement
-  relation_array = Array{String,1}()
-
-  # Neighbors will keep track of connections to junction nodes
-  neighbors = fill((Array{String,1}(),Array{String,1}()), length(verts))
-
-  neighbors[1] = (Array{String,1}(),fill("", length(wd.input_ports)))
-  neighbors[2] = (fill("", length(wd.output_ports)),Array{String,1}())
-  for i in 3:length(neighbors)
-    if verts[i].is_junc
-      neighbors[i] = ([""],[""])
-    else
-      neighbors[i] = (fill("",length(tables[verts[i].name][1])),
-                      fill("",length(tables[verts[i].name][2])))
-    end
-  end
-
+  # At this point, all junctions are defined. Now we just have to loop throughg
+  # them to assign equivalences
   for e in wires(wd)
-    sb = e.source.box
-    sp = e.source.port
-    db = e.target.box
-    dp = e.target.port
-    src = ""
-    dst = ""
-
-    if verts[sb].is_junc && verts[db].is_junc
-      continue
-    elseif verts[sb].is_junc
-      df = tables[verts[db].name][1][dp]
-      if verts[db].is_dagger
-        df = tables[verts[db].name][2][dp]
-      end
-      if neighbors[sb][2][sp] == ""
-        neighbors[sb][2][sp] = "$(ind_to_alias(db)).$df"
-        continue
-      else
-        src = neighbors[sb][2][sp]
-        dst = "$(ind_to_alias(db)).$df"
-      end
-    elseif verts[db].is_junc
-      sf = tables[verts[sb].name][2][sp]
-      if verts[sb].is_dagger
-        sf = tables[verts[sb].name][1][sp]
-      end
-      if neighbors[db][1][dp] == ""
-        neighbors[db][1][dp] = "$(ind_to_alias(sb)).$sf"
-        continue
-      else
-        src = neighbors[db][1][dp]
-        dst = "$(ind_to_alias(sb)).$sf"
-      end
-    else
-      sf = tables[verts[sb].name][2][sp]
-      if verts[sb].is_dagger
-        sf = tables[verts[sb].name][1][sp]
-      end
-      src = "$(ind_to_alias(sb)).$sf"
-
-      df = tables[verts[db].name][1][dp]
-      if verts[db].is_dagger
-        df = tables[verts[db].name][2][dp]
-      end
-      dst = "$(ind_to_alias(db)).$df"
+    src = port_val[e.source.box][2][e.source.port]
+    dst = port_val[e.target.box][1][e.target.port]
+g
+    if src == "*" || dst == "*"
+      throw(ArgumentError("Wiring Diagram is insufficiently defined"))
     end
 
-    if dst*"="*src in relation_array || src*"="*dst in relation_array
-      continue
+    if src != dst && !(dst*"="*src in rel_statement) &&g
+                     !(src*"="*dst in rel_statement)
+      push!(rel_statement, src*"="*dst)
     end
-    push!(relation_array, src*"="*dst)
   end
-
+g
   # The only important junction nodes are the input/output nodes
-  dom_array = neighbors[1][2]
-  codom_array = neighbors[2][1]
+  dom_array = port_val[1][2]
+  codom_array = port_val[2][1]
 
   select = "SELECT "*join(vcat(dom_array, codom_array), ", ")*"\n"
-  from = "FROM "*join(alias_array, ", ")*"\n"
-  condition = "WHERE "*join(relation_array, " AND ")*";"
+  from = "FROM "*join(join_statement, ", ")*"\n"
+  condition = ";"
+  if length(condition) != 0
+    condition = "WHERE "*join(rel_statement, " AND ")*";"
+  end
 
   return select*from*condition
 end
 
-sql(types, tables, schema) = begin
-  primitives = map(collect(types)) do (key,val)
-    @show key
+
+sql(types_dict, tables, schema) = begin
+  primitives = map(collect(types_dict)) do (key,val)
     names = val[1]
     types = val[2]
 
@@ -152,7 +147,6 @@ sql(types, tables, schema) = begin
   end
 
   data_tables = map(collect(tables)) do (key,val)
-    @show key
     dom_names   = val[1]
     codom_names = val[2]
     hom = schema.generators_by_name[Symbol(key)]
@@ -163,32 +157,124 @@ sql(types, tables, schema) = begin
       f_types = hom.type_args[1].args
       for i in 1:length(dom_names)
         type = f_types[i].args[1]
-        push!(fields, "$(dom_names[i]) $type")
+        if length(types_dict[type][1]) == 0
+          push!(fields, "$(dom_names[i]) $(TypeToSql[types_dict[type][2][1]])")
+        else
+          push!(fields, "$(dom_names[i]) $type")
+        end
       end
     else
       type = hom.type_args[1].args[1]
-      push!(fields, "$(dom_names[1]) $type")
+      if length(types_dict[type][1]) == 0
+        push!(fields, "$(dom_names[1]) $(TypeToSql[types_dict[type][2][1]])")
+      else
+        push!(fields, "$(dom_names[1]) $type")
+      end
     end
-    
+g
     # Evaluate Codom
     if length(codom_names) > 1
       f_types = hom.type_args[2].args
       for i in 1:length(codom_names)
         type = f_types[i].args[1]
-        push!(fields, "$(codom_names[i]) $type")
+        if length(types_dict[type][1]) == 0
+          push!(fields, "$(codom_names[i]) $(TypeToSql[types_dict[type][2][1]])")
+        else
+          push!(fields, "$(codom_names[i]) $type")
+        end
       end
     else
       type = hom.type_args[2].args[1]
-      push!(fields, "$(codom_names[1]) $type")
+      if length(types_dict[type][1]) == 0
+        push!(fields, "$(codom_names[1]) $(TypeToSql[types_dict[type][2][1]])")
+      else
+        push!(fields, "$(codom_names[1]) $type")
+      end
     end
-    
+g
     "CREATE TABLE $key ($(join(fields, ", ")))"
   end
 
   "$(join(vcat(primitives,data_tables),";\n"));"
 end
 
-sql(s::Schema) = begin
+
+# Need to generate a wrapper call around this to insert parameters
+# If the original query accepts a person's name (p_name) and returns
+# their manager's name (m_name) and the person's salary (salary), then
+# the wrapped query would look like this:
+#
+#g
+# PREPARE "12345" (text, text) ASg
+# SELECT t3.p_name, t4.m_name, t5.salary
+# FROM names AS t3, manager AS t4, salary AS t5
+# WHERE t3.person=t4.person AND t3.person=t5.person
+# AND t3.p_name = ROW($1, $2);g
+present_sql(q::Query, uid::String)::String = begin
+  types = q.types
+  tables = q.tables
+  wd = q.wd
+
+  rel_statement = Array{String,1}()
+
+  # Define a mapping from port to field name
+  # This will have the format port_val[box][dom/cod][port] = String
+  join_statement, port_val = evaluate_ports(q)
+
+  # At this point, all junctions are defined. Now we just have to loop throughg
+  # them to assign equivalences
+  for e in wires(wd)
+    src = port_val[e.source.box][2][e.source.port]
+    dst = port_val[e.target.box][1][e.target.port]
+g
+    if src == "*" || dst == "*"
+      throw(ArgumentError("Wiring Diagram is insufficiently defined"))
+    end
+
+    if src != dst && !(dst*"="*src in rel_statement) &&g
+                     !(src*"="*dst in rel_statement)
+      push!(rel_statement, src*"="*dst)
+    end
+  end
+g
+  # The only important junction nodes are the input/output nodes
+  dom_array = port_val[1][2]
+  codom_array = port_val[2][1]
+
+  # Extrapolate types from dom names
+  type_arr = Array{String,1}()
+
+  dom_types = wd.input_ports
+  cur_sym = 1
+  for (ind, val) in enumerate(dom_array)
+    type = types[dom_types[ind]]
+
+    if length(type[1]) == 0
+      push!(type_arr, TypeToSql[type[2][1]])
+      relation = "$val=\$$cur_sym"
+      push!(rel_statement, relation)
+      cur_sym += 1
+    else
+      sym_arr = Array{String,1}()
+      for j_type in type[2]
+        push!(type_arr, TypeToSql[j_type])
+        push!(sym_arr, "\$$cur_sym")
+        cur_sym += 1
+      end
+      relation = "$val=ROW($(join(sym_arr, ",")))"
+      push!(rel_statement, relation)
+    end
+  end
+
+  select = "SELECT "*join(vcat(dom_array, codom_array), ", ")*"\n"
+  from = "FROM "*join(join_statement, ", ")*"\n"
+  condition = "WHERE "*join(rel_statement, " AND ")
+
+  res = "PREPARE \"$uid\" ($(join(type_arr,","))) AS\n$select$from$condition;"
+  return res
+end
+
+#=sql(s::Schema) = begin
 
   # First make sql for data types
   primitives = map(s.types) do t
@@ -246,6 +332,6 @@ sql(s::Schema) = begin
     "CREATE TABLE $(t.args[1].name) ($(fields));"
   end
   return primitives, tables
-end
+end=#
 
 end
