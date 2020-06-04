@@ -37,7 +37,7 @@ function evaluate_ports(q::Query)
       is_dagger = true
     end
     box_name = cur_box.value
-g
+
     # Push table name to the total join statement and assign an alias
     push!(aliases, "$box_name AS t$id")
 
@@ -83,7 +83,7 @@ g
       end
     end
   end
-g
+
   aliases, port_val
 end
 
@@ -99,22 +99,22 @@ function sql(q::Query)::String
   # This will have the format port_val[box][dom/cod][port] = String
   join_statement, port_val = evaluate_ports(q)
 
-  # At this point, all junctions are defined. Now we just have to loop throughg
+  # At this point, all junctions are defined. Now we just have to loop through
   # them to assign equivalences
   for e in wires(wd)
     src = port_val[e.source.box][2][e.source.port]
     dst = port_val[e.target.box][1][e.target.port]
-g
+
     if src == "*" || dst == "*"
       throw(ArgumentError("Wiring Diagram is insufficiently defined"))
     end
 
-    if src != dst && !(dst*"="*src in rel_statement) &&g
+    if src != dst && !(dst*"="*src in rel_statement) &&
                      !(src*"="*dst in rel_statement)
       push!(rel_statement, src*"="*dst)
     end
   end
-g
+
   # The only important junction nodes are the input/output nodes
   dom_array = port_val[1][2]
   codom_array = port_val[2][1]
@@ -171,7 +171,7 @@ sql(types_dict, tables, schema) = begin
         push!(fields, "$(dom_names[1]) $type")
       end
     end
-g
+
     # Evaluate Codom
     if length(codom_names) > 1
       f_types = hom.type_args[2].args
@@ -191,7 +191,7 @@ g
         push!(fields, "$(codom_names[1]) $type")
       end
     end
-g
+
     "CREATE TABLE $key ($(join(fields, ", ")))"
   end
 
@@ -204,12 +204,12 @@ end
 # their manager's name (m_name) and the person's salary (salary), then
 # the wrapped query would look like this:
 #
-#g
-# PREPARE "12345" (text, text) ASg
+#
+# PREPARE "12345" (text, text) AS
 # SELECT t3.p_name, t4.m_name, t5.salary
 # FROM names AS t3, manager AS t4, salary AS t5
 # WHERE t3.person=t4.person AND t3.person=t5.person
-# AND t3.p_name = ROW($1, $2);g
+# AND t3.p_name = ROW($1, $2);
 present_sql(q::Query, uid::String)::String = begin
   types = q.types
   tables = q.tables
@@ -221,22 +221,22 @@ present_sql(q::Query, uid::String)::String = begin
   # This will have the format port_val[box][dom/cod][port] = String
   join_statement, port_val = evaluate_ports(q)
 
-  # At this point, all junctions are defined. Now we just have to loop throughg
+  # At this point, all junctions are defined. Now we just have to loop through
   # them to assign equivalences
   for e in wires(wd)
     src = port_val[e.source.box][2][e.source.port]
     dst = port_val[e.target.box][1][e.target.port]
-g
+
     if src == "*" || dst == "*"
       throw(ArgumentError("Wiring Diagram is insufficiently defined"))
     end
 
-    if src != dst && !(dst*"="*src in rel_statement) &&g
+    if src != dst && !(dst*"="*src in rel_statement) &&
                      !(src*"="*dst in rel_statement)
       push!(rel_statement, src*"="*dst)
     end
   end
-g
+
   # The only important junction nodes are the input/output nodes
   dom_array = port_val[1][2]
   codom_array = port_val[2][1]
