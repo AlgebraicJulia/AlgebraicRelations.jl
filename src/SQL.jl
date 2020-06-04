@@ -1,5 +1,5 @@
 module SQL
-export sql, present_sql, TypeToSql
+export sql, present_sql, to_sql
 using Catlab.Doctrines, Catlab.Present, Catlab.WiringDiagrams
 using AlgebraicRelations.QueryLib, AlgebraicRelations.SchemaLib
 import AlgebraicRelations.SchemaLib: Schema
@@ -7,6 +7,13 @@ import AlgebraicRelations.SchemaLib: Schema
 TypeToSql = Dict(String => "text",
                  Int64 => "int",
                  Float64 => "float4")
+
+function to_sql(t)
+  if t isa DataType
+    return TypeToSql[t]
+  end
+  return t
+end
 
 function evaluate_ports(q::Query)
   wd = q.wd
@@ -45,7 +52,7 @@ function evaluate_ports(q::Query)
     port_val[id][1] = map(1:length(cur_box.input_ports)) do port
                         "t$id."*tables[box_name][1][port]
                       end
-    port_val[id][2] = map(1:length(cur_box.input_ports)) do port
+    port_val[id][2] = map(1:length(cur_box.output_ports)) do port
                         "t$id."*tables[box_name][2][port]
                       end
     if is_dagger
@@ -137,11 +144,11 @@ sql(types_dict, tables, schema) = begin
 
     if length(names) == 0
       # In this case, it's just a primitive type
-      return "-- primitive type $(TypeToSql[types[1]])"
+      return "-- primitive type $(to_sql(types[1]))"
     end
 
     fields = map(enumerate(names)) do (ind, name)
-      return "$name $(TypeToSql[types[ind]])"
+      return "$name $(to_sql(types[ind]))"
     end
     statement = "CREATE TYPE $key AS ($(join(fields,", ")))"
   end
@@ -158,7 +165,7 @@ sql(types_dict, tables, schema) = begin
       for i in 1:length(dom_names)
         type = f_types[i].args[1]
         if length(types_dict[type][1]) == 0
-          push!(fields, "$(dom_names[i]) $(TypeToSql[types_dict[type][2][1]])")
+          push!(fields, "$(dom_names[i]) $(to_sql(types_dict[type][2][1]))")
         else
           push!(fields, "$(dom_names[i]) $type")
         end
@@ -166,7 +173,7 @@ sql(types_dict, tables, schema) = begin
     else
       type = hom.type_args[1].args[1]
       if length(types_dict[type][1]) == 0
-        push!(fields, "$(dom_names[1]) $(TypeToSql[types_dict[type][2][1]])")
+        push!(fields, "$(dom_names[1]) $(to_sql(types_dict[type][2][1]))")
       else
         push!(fields, "$(dom_names[1]) $type")
       end
@@ -178,7 +185,7 @@ sql(types_dict, tables, schema) = begin
       for i in 1:length(codom_names)
         type = f_types[i].args[1]
         if length(types_dict[type][1]) == 0
-          push!(fields, "$(codom_names[i]) $(TypeToSql[types_dict[type][2][1]])")
+          push!(fields, "$(codom_names[i]) $(to_sql(types_dict[type][2][1]))")
         else
           push!(fields, "$(codom_names[i]) $type")
         end
@@ -186,7 +193,7 @@ sql(types_dict, tables, schema) = begin
     else
       type = hom.type_args[2].args[1]
       if length(types_dict[type][1]) == 0
-        push!(fields, "$(codom_names[1]) $(TypeToSql[types_dict[type][2][1]])")
+        push!(fields, "$(codom_names[1]) $(Tto_sql(types_dict[type][2][1]))")
       else
         push!(fields, "$(codom_names[1]) $type")
       end
@@ -250,14 +257,14 @@ present_sql(q::Query, uid::String)::String = begin
     type = types[dom_types[ind]]
 
     if length(type[1]) == 0
-      push!(type_arr, TypeToSql[type[2][1]])
+      push!(type_arr, to_sql(type[2][1]))
       relation = "$val=\$$cur_sym"
       push!(rel_statement, relation)
       cur_sym += 1
     else
       sym_arr = Array{String,1}()
       for j_type in type[2]
-        push!(type_arr, TypeToSql[j_type])
+        push!(type_arr, to_sql(j_type))
         push!(sym_arr, "\$$cur_sym")
         cur_sym += 1
       end
