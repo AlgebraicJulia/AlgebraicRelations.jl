@@ -35,7 +35,7 @@ This structure holds the relationship graph between fields in a query
                        information for the query.
 """
 struct Query
-  types::Dict{Symbol, Tuple{Array{String,1}, Array{DataType,1}}}
+  types::Dict{Symbol, Tuple{Array{String,1}, Array{T,1} where T}}
   tables::Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}}
   wd::WiringDiagram
   Query(types, tables, wd) = new(types, tables, merge_junctions(wd))
@@ -115,7 +115,7 @@ end
 end
 
 # Define a query based off of a formula and a table of column names
-Query(types::Dict{Symbol, Tuple{Array{T,1} where T, Array{DataType,1}}},
+Query(types::Dict{Symbol, Tuple{Array{T,1} where T, Array{T,1} where T}},
       tables::Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}},
       q::GATExpr) = begin
   Query(types, tables, to_wiring_diagram(q))

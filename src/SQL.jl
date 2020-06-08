@@ -193,7 +193,7 @@ sql(types_dict, tables, schema) = begin
     else
       type = hom.type_args[2].args[1]
       if length(types_dict[type][1]) == 0
-        push!(fields, "$(codom_names[1]) $(Tto_sql(types_dict[type][2][1]))")
+        push!(fields, "$(codom_names[1]) $(to_sql(types_dict[type][2][1]))")
       else
         push!(fields, "$(codom_names[1]) $type")
       end
