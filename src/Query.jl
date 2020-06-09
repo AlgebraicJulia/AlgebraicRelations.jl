@@ -115,8 +115,7 @@ end
 end
 
 # Define a query based off of a formula and a table of column names
-Query(types::Dict{Symbol, Tuple{Array{T,1} where T, Array{T,1} where T}},
-      tables::Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}},
+Query(types, tables::Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}},
       q::GATExpr) = begin
   Query(types, tables, to_wiring_diagram(q))
 end
