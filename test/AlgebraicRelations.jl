@@ -69,7 +69,7 @@ query(f) = to_sql(make_query(schema, f))
 
 println(query(formula))
 
-#conn = Connection("dbname=e3isd")
+#conn = Connection("dbname=test_db")
 #statement = prepare(conn, schema, formula)
 #println(execute(conn, schema, formula))
 #println(execute(statement, ["ROW(1)"]))
