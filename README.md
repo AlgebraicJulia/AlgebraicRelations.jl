@@ -32,6 +32,6 @@ The tables are defined as relationships between these types with a `symbol` repr
 
 ### Creating Queries
 
-### Connecting to PosgreSQL
+### Connecting to PostgreSQL
 
 ## Theory
