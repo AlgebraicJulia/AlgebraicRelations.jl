@@ -8,6 +8,34 @@ TypeToSql = Dict(String => "text",
                  Int64 => "int",
                  Float64 => "float4")
 
+uniquify(a::Array{String,1}) = begin
+  a_n = Array{String,1}()
+  # Fill a_n with unique values
+  for i in 1:length(a)
+    cur_val = a[i]
+
+    # Iterate the digit until the value is unique
+    while cur_val in a_n
+      if occursin(r"_\d*$", cur_val)
+        cur_val = replace(cur_val, r"_\d*$" => (c) -> "_"*string(parse(Int, c[2:end])+1))
+      else
+        cur_val = cur_val*"_0"
+      end
+    end
+    append!(a_n, [cur_val])
+  end
+  return a_n
+end
+
+function add_aliases(names::Array{String,1})
+  aliases = map(names) do name
+              p_ind = findfirst(".", name)[1]
+              name[(p_ind+1):end]
+            end
+  aliases = uniquify(aliases)
+  new_names = [n*" AS "*a for (n,a) in zip(names, aliases)]
+  return new_names
+end
 function to_sql(t)
   if t isa DataType
     return TypeToSql[t]
@@ -126,7 +154,9 @@ function sql(q::Query)::String
   dom_array = port_val[1][2]
   codom_array = port_val[2][1]
 
-  select = "SELECT "*join(vcat(dom_array, codom_array), ", ")*"\n"
+  f_names = add_aliases(vcat(dom_array, codom_array))
+
+  select = "SELECT "*join(f_names, ", ")*"\n"
   from = "FROM "*join(join_statement, ", ")*"\n"
   condition = ";"
   if length(condition) != 0
@@ -273,7 +303,9 @@ present_sql(q::Query, uid::String)::String = begin
     end
   end
 
-  select = "SELECT "*join(vcat(dom_array, codom_array), ", ")*"\n"
+  f_names = add_aliases(vcat(dom_array, codom_array))
+
+  select = "SELECT "*join(f_names, ", ")*"\n"
   from = "FROM "*join(join_statement, ", ")*"\n"
   condition = "WHERE "*join(rel_statement, " AND ")
 
