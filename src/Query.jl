@@ -3,7 +3,8 @@ module QueryLib
 export Ports, Query, make_query,
   Ob, Hom, dom, codom, compose, ⋅, ∘, id, otimes, ⊗, munit, braid, σ,
   dagger, dunit, dcounit, mcopy, Δ, delete, ◊, mmerge, ∇, create, □,
-  meet, top, FreeBicategoryRelations, to_presentation, draw_query
+  meet, top, FreeBicategoryRelations, @program,
+  to_presentation, draw_query
   #, plus, zero, coplus, cozero,  join, bottom
 
 using Catlab, Catlab.Doctrines, Catlab.Present,
@@ -14,6 +15,7 @@ import Catlab.Doctrines:
   dagger, dunit, dcounit, mcopy, Δ, delete, ◊, mmerge, ∇, create, □,
   plus, zero, coplus, cozero, meet, top, join, bottom, distribute_dagger,
   FreeBicategoryRelations
+import Catlab.Programs: @program
 
 using AutoHashEquals
 
