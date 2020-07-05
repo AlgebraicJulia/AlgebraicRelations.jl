@@ -1,5 +1,7 @@
 # AlgebraicRelations.jl
 
+![Tests](https://github.com/AlgebraicJulia/AlgebraicRelations.jl/workflows/Tests/badge.svg)
+
 AlgebraicRelations.jl is a Julia library built to provide an intuitive and elegant method for generating SQL queries. This package provides tooling for defining database schemas, generating query visualizations, and connecting directly up to a PostgreSQL server. This package is built on top of [Catlab.jl](https://github.com/epatters/Catlab.jl) which is the powerhouse behind its functions.
 
 ## Learning by Doing
