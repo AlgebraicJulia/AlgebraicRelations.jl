@@ -1,6 +1,6 @@
 module SQL
 export sql, present_sql, to_sql
-using Catlab.Doctrines, Catlab.Present, Catlab.WiringDiagrams
+using Catlab.Theories, Catlab.Present, Catlab.WiringDiagrams
 using AlgebraicRelations.QueryLib, AlgebraicRelations.SchemaLib
 import AlgebraicRelations.SchemaLib: Schema
 

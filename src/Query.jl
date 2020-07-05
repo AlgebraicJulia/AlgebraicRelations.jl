@@ -7,10 +7,10 @@ export Ports, Query, make_query,
   to_presentation, draw_query
   #, plus, zero, coplus, cozero,  join, bottom
 
-using Catlab, Catlab.Doctrines, Catlab.Present,
+using Catlab, Catlab.Theories, Catlab.Present,
       Catlab.WiringDiagrams, Catlab.Graphics,
       Catlab.Graphics.Graphviz
-import Catlab.Doctrines:
+import Catlab.Theories:
   Ob, Hom, dom, codom, compose, ⋅, ∘, id, otimes, ⊗, munit, braid, σ,
   dagger, dunit, dcounit, mcopy, Δ, delete, ◊, mmerge, ∇, create, □,
   plus, zero, coplus, cozero, meet, top, join, bottom, distribute_dagger,

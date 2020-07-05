@@ -7,7 +7,7 @@ using Markdown
 begin
 	using Pkg
 	Pkg.activate(".")
-	using AlgebraicRelations.QueryLib, AlgebraicRelations.SQL, 
+	using AlgebraicRelations.QueryLib, AlgebraicRelations.SQL,
 		  AlgebraicRelations.Interface;
 	using Markdown
 end
