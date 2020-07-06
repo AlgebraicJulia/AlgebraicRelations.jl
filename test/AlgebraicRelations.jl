@@ -102,3 +102,31 @@ A = DBInterface.execute(db, sql(qp)) |> DataFrame
         150000.0,
         90000.0,
         150000.0] == A[!,"salary"]
+
+# Formula Method Tests
+
+# This should get everyone whose manager is their own manager
+f = Δ(person)⋅((manager⋅Δ(person)⋅(id(person)⊗manager)⋅dcounit(person))⊗names)
+
+qp = Query(types, tables, f)
+A = DBInterface.execute(db, sql(qp)) |> DataFrame
+@test A isa DataFrame
+@test ["Alice Smith",
+       "Bob Jones",
+       "John Doe"] == A[!,"full_name"]
+
+# This should get the name of each person and the salary of their manager
+f = Δ(person)⋅(names⊗(manager⋅salary))
+
+qp = Query(types, tables, f)
+A = DBInterface.execute(db, sql(qp)) |> DataFrame
+@test A isa DataFrame
+@test ["Alice Smith",
+       "Bob Jones",
+       "Eve Johnson",
+       "John Doe"] == A[!,"full_name"]
+
+@test [ 150000.0,
+        150000.0,
+        90000.0,
+        150000.0] == A[!,"salary"]
