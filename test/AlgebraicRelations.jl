@@ -1,7 +1,7 @@
 # here is an example
 using Catlab, Catlab.Theories, Catlab.Present
 using AlgebraicRelations.QueryLib, AlgebraicRelations.SQL,
-			AlgebraicRelations.Interface;
+      AlgebraicRelations.Interface;
 using SQLite
 using DataFrames
 
@@ -41,92 +41,98 @@ splt_stmts = split(sql(types, tables, schema), "\n")
 # Filter out comments which don't error in PostgresSql
 filter!(l->l[1] != '-', splt_stmts)
 
-for stmt in splt_stmts
-  @test DBInterface.execute(db, stmt) isa SQLite.Query
+@testset "Generate DB Schema" begin
+  for stmt in splt_stmts
+    @test DBInterface.execute(db, stmt) isa SQLite.Query
+  end
 end
 
 # Fill out the table
 insert_stmts = ["INSERT INTO employees VALUES (1, 1);",
-								"INSERT INTO employees VALUES (2, 2);",
-								"INSERT INTO employees VALUES (3, 3);",
-								"INSERT INTO employees VALUES (4, 4);",
-								"INSERT INTO customers VALUES (1, 5);",
-								"INSERT INTO customers VALUES (5, 6);",
-								"INSERT INTO names     VALUES (1, 'Alice Smith');",
-								"INSERT INTO names     VALUES (2, 'Bob Jones');",
-								"INSERT INTO names     VALUES (3, 'Eve Johnson');",
-								"INSERT INTO names     VALUES (4, 'John Doe');",
-								"INSERT INTO names     VALUES (5, 'Jane Doe');",
-								"INSERT INTO manager   VALUES (1, 1);",
-								"INSERT INTO manager   VALUES (2, 1);",
-								"INSERT INTO manager   VALUES (3, 4);",
-								"INSERT INTO manager   VALUES (4, 1);",
-								"INSERT INTO salary    VALUES (1, 150000);",
-								"INSERT INTO salary    VALUES (2, 50000);",
-								"INSERT INTO salary    VALUES (3, 80000);",
-								"INSERT INTO salary    VALUES (4, 90000);"]
+                "INSERT INTO employees VALUES (2, 2);",
+                "INSERT INTO employees VALUES (3, 3);",
+                "INSERT INTO employees VALUES (4, 4);",
+                "INSERT INTO customers VALUES (1, 5);",
+                "INSERT INTO customers VALUES (5, 6);",
+                "INSERT INTO names     VALUES (1, 'Alice Smith');",
+                "INSERT INTO names     VALUES (2, 'Bob Jones');",
+                "INSERT INTO names     VALUES (3, 'Eve Johnson');",
+                "INSERT INTO names     VALUES (4, 'John Doe');",
+                "INSERT INTO names     VALUES (5, 'Jane Doe');",
+                "INSERT INTO manager   VALUES (1, 1);",
+                "INSERT INTO manager   VALUES (2, 1);",
+                "INSERT INTO manager   VALUES (3, 4);",
+                "INSERT INTO manager   VALUES (4, 1);",
+                "INSERT INTO salary    VALUES (1, 150000);",
+                "INSERT INTO salary    VALUES (2, 50000);",
+                "INSERT INTO salary    VALUES (3, 80000);",
+                "INSERT INTO salary    VALUES (4, 90000);"]
 
 for stmt in insert_stmts
-	DBInterface.execute(db, stmt)
+  DBInterface.execute(db, stmt)
 end
 
-# This should get everyone whose manager is their own manager
-f = @program schema (p::person) begin
-	m = manager(p)
-  m1 = manager(m)
-  dcounit{person}(m,m1)
-  return names(p)
+@testset "SQL From @program" begin
+  # This should get everyone whose manager is their own manager
+  f = @program schema (p::person) begin
+    m = manager(p)
+    m1 = manager(m)
+    dcounit{person}(m,m1)
+    return names(p)
+  end
+
+  qp = Query(types, tables, f)
+  A = DBInterface.execute(db, sql(qp)) |> DataFrame
+  @test A isa DataFrame
+  @test ["Alice Smith",
+         "Bob Jones",
+         "John Doe"] == A[!,"full_name"]
+
+  # This should get the name of each person and the salary of their manager
+  f = @program schema (p::person) begin
+    return names(p), salary(manager(p))
+  end
+
+  qp = Query(types, tables, f)
+  A = DBInterface.execute(db, sql(qp)) |> DataFrame
+  @test A isa DataFrame
+  @test ["Alice Smith",
+         "Bob Jones",
+         "Eve Johnson",
+         "John Doe"] == A[!,"full_name"]
+
+  @test [ 150000.0,
+          150000.0,
+          90000.0,
+          150000.0] == A[!,"salary"]
 end
 
-qp = Query(types, tables, f)
-A = DBInterface.execute(db, sql(qp)) |> DataFrame
-@test A isa DataFrame
-@test ["Alice Smith",
-       "Bob Jones",
-       "John Doe"] == A[!,"full_name"]
+@testset "SQL From Formula" begin
+  # Formula Method Tests
 
-# This should get the name of each person and the salary of their manager
-f = @program schema (p::person) begin
-  return names(p), salary(manager(p))
+  # This should get everyone whose manager is their own manager
+  f = Δ(person)⋅((manager⋅Δ(person)⋅(id(person)⊗manager)⋅dcounit(person))⊗names)
+
+  qp = Query(types, tables, f)
+  A = DBInterface.execute(db, sql(qp)) |> DataFrame
+  @test A isa DataFrame
+  @test ["Alice Smith",
+         "Bob Jones",
+         "John Doe"] == A[!,"full_name"]
+
+  # This should get the name of each person and the salary of their manager
+  f = Δ(person)⋅(names⊗(manager⋅salary))
+
+  qp = Query(types, tables, f)
+  A = DBInterface.execute(db, sql(qp)) |> DataFrame
+  @test A isa DataFrame
+  @test ["Alice Smith",
+         "Bob Jones",
+         "Eve Johnson",
+         "John Doe"] == A[!,"full_name"]
+
+  @test [ 150000.0,
+          150000.0,
+          90000.0,
+          150000.0] == A[!,"salary"]
 end
-
-qp = Query(types, tables, f)
-A = DBInterface.execute(db, sql(qp)) |> DataFrame
-@test A isa DataFrame
-@test ["Alice Smith",
-       "Bob Jones",
-       "Eve Johnson",
-       "John Doe"] == A[!,"full_name"]
-
-@test [ 150000.0,
-        150000.0,
-        90000.0,
-        150000.0] == A[!,"salary"]
-
-# Formula Method Tests
-
-# This should get everyone whose manager is their own manager
-f = Δ(person)⋅((manager⋅Δ(person)⋅(id(person)⊗manager)⋅dcounit(person))⊗names)
-
-qp = Query(types, tables, f)
-A = DBInterface.execute(db, sql(qp)) |> DataFrame
-@test A isa DataFrame
-@test ["Alice Smith",
-       "Bob Jones",
-       "John Doe"] == A[!,"full_name"]
-
-# This should get the name of each person and the salary of their manager
-f = Δ(person)⋅(names⊗(manager⋅salary))
-
-qp = Query(types, tables, f)
-A = DBInterface.execute(db, sql(qp)) |> DataFrame
-@test A isa DataFrame
-@test ["Alice Smith",
-       "Bob Jones",
-       "Eve Johnson",
-       "John Doe"] == A[!,"full_name"]
-
-@test [ 150000.0,
-        150000.0,
-        90000.0,
-        150000.0] == A[!,"salary"]
