@@ -125,7 +125,7 @@ end
 # Generate a Catlab Presentation from homs and obs
 to_presentation(types::Array{<:GATExpr{:generator},1},
                 tables::Array{<:GATExpr{:generator},1})::Presentation = begin
-  p = Presentation()
+  p = Presentation(FreeBicategoryRelations)
   add_generators!(p, types)
   add_generators!(p, tables)
   return p

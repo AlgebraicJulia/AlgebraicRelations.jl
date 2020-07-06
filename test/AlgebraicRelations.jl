@@ -1,77 +1,138 @@
 # here is an example
-using Catlab, Catlab.Doctrines, Catlab.Present
-using Schema.QueryLib, Schema.Presentation
-using Schema.Interface
-import Schema.Presentation: Schema, sql
+using Catlab, Catlab.Theories, Catlab.Present
+using AlgebraicRelations.QueryLib, AlgebraicRelations.SQL,
+      AlgebraicRelations.Interface;
+using SQLite
+using DataFrames
 
-# Define the Types
-Name = Ob(FreeBicategoryRelations, (:full_name, (first=String, last=String)))
-Person = Ob(FreeBicategoryRelations, (:person, (id=Int,)))
-X = Ob(FreeBicategoryRelations, (:X, Int))
-F = Ob(FreeBicategoryRelations, (:F, Float64))
-ID = Ob(FreeBicategoryRelations, (:ID, (id=Int,)))
+full_name = Ob(FreeBicategoryRelations, :full_name);
+person = Ob(FreeBicategoryRelations, :person);
+F = Ob(FreeBicategoryRelations, :F);
+ID = Ob(FreeBicategoryRelations, :ID);
 
-# Define the relationships
-name = Hom((name=:names, fields=("person", "full_name")), Person, Name)
-emply = Hom((name=:employees, fields=("person", "ID")), Person, ID)
-custo = Hom((name=:customers, fields=("person", "ID")), Person, ID)
-manag = Hom((name=:manager, fields=("person", "manager")), Person, Person)
-salry = Hom((name=:salary, fields=("person", "salary")), Person, F)
-e_cust_conn = Hom((name=:interactions, fields=(["employee", "customer"], "interaction")), Person⊗Person, X)
+names = Hom(:names, person, full_name);
+employees = Hom(:employees, person, ID);
+customers = Hom(:customers, person, ID);
+manager = Hom(:manager, person, person);
+salary = Hom(:salary, person, F);
+relation = Hom(:relation, person⊗person, F);
 
-# Set up arrays of types and relationships for Schema
-types = [Name, Person, X,F,ID]
-rels = [name, emply, custo, manag, salry, e_cust_conn]
+types  = Dict(:full_name => ([],[String]),
+        :person    => ([], [Int]),
+        :F         => ([], [Float64]),
+        :ID        => ([], [Int]))
 
-schema = Schema(types, rels)
+# Tables -> Column names
+tables = Dict(:names     => (["person"], ["full_name"]),
+        :employees => (["person"],["ID"]),
+        :customers => (["person"],["ID"]),
+        :manager   => (["person"],["manager"]),
+        :salary    => (["person"],["salary"]),
+        :relation  => (["person1", "person2"], ["relationship"]))
 
-# Generate the Schema
-prim, tab = sql(schema)
-println("Copy the following to generate a database:")
-println(join(prim,"\n"))
-println(join(tab, "\n"))
+# Fill the table
+syntax_types  = [full_name, person, F, ID]
+syntax_tables = [names, employees, customers, manager, salary, relation]
+schema = to_presentation(syntax_types, syntax_tables)
 
-# Fill table with testing information
+db = SQLite.DB()
+splt_stmts = split(sql(types, tables, schema), "\n")
 
-println("Copy the following insertion statements to fill the table:")
-println("INSERT INTO employees VALUES (ROW(1), ROW(1));")
-println("INSERT INTO employees VALUES (ROW(2), ROW(2));")
-println("INSERT INTO employees VALUES (ROW(3), ROW(3));")
-println("INSERT INTO employees VALUES (ROW(4), ROW(4));")
-println("INSERT INTO customers VALUES (ROW(1), ROW(5));")
-println("INSERT INTO customers VALUES (ROW(5), ROW(6));")
-println("INSERT INTO names     VALUES (ROW(1), ROW('Alice', 'Smith'));")
-println("INSERT INTO names     VALUES (ROW(2), ROW('Bob', 'Jones'));")
-println("INSERT INTO names     VALUES (ROW(3), ROW('Eve', 'Johnson'));")
-println("INSERT INTO names     VALUES (ROW(4), ROW('John', 'Doe'));")
-println("INSERT INTO names     VALUES (ROW(5), ROW('Jane', 'Doe'));")
-println("INSERT INTO manager   VALUES (ROW(1), ROW(1));")
-println("INSERT INTO manager   VALUES (ROW(2), ROW(1));")
-println("INSERT INTO manager   VALUES (ROW(3), ROW(4));")
-println("INSERT INTO manager   VALUES (ROW(4), ROW(1));")
-println("INSERT INTO salary    VALUES (ROW(1), 150000);")
-println("INSERT INTO salary    VALUES (ROW(2), 50000);")
-println("INSERT INTO salary    VALUES (ROW(3), 80000);")
-println("INSERT INTO salary    VALUES (ROW(4), 90000);")
+# Filter out comments which don't error in PostgresSql
+filter!(l->l[1] != '-', splt_stmts)
 
-# Generate and display a query to get (names, salaries)
-println("Copy the following to generate run the query:")
+@testset "Generate DB Schema" begin
+  for stmt in splt_stmts
+    @test DBInterface.execute(db, stmt) isa SQLite.Query
+  end
+end
 
-#Salary and manager's name for each person
-#formula = dagger(name)⋅mcopy(Person)⋅(salry⊗(manag⋅name))⋅σ(F,Name)
+# Fill out the table
+insert_stmts = ["INSERT INTO employees VALUES (1, 1);",
+                "INSERT INTO employees VALUES (2, 2);",
+                "INSERT INTO employees VALUES (3, 3);",
+                "INSERT INTO employees VALUES (4, 4);",
+                "INSERT INTO customers VALUES (1, 5);",
+                "INSERT INTO customers VALUES (5, 6);",
+                "INSERT INTO names     VALUES (1, 'Alice Smith');",
+                "INSERT INTO names     VALUES (2, 'Bob Jones');",
+                "INSERT INTO names     VALUES (3, 'Eve Johnson');",
+                "INSERT INTO names     VALUES (4, 'John Doe');",
+                "INSERT INTO names     VALUES (5, 'Jane Doe');",
+                "INSERT INTO manager   VALUES (1, 1);",
+                "INSERT INTO manager   VALUES (2, 1);",
+                "INSERT INTO manager   VALUES (3, 4);",
+                "INSERT INTO manager   VALUES (4, 1);",
+                "INSERT INTO salary    VALUES (1, 150000);",
+                "INSERT INTO salary    VALUES (2, 50000);",
+                "INSERT INTO salary    VALUES (3, 80000);",
+                "INSERT INTO salary    VALUES (4, 90000);"]
 
-# Employees who have the same salary and manager
-#formula = dagger(name)⋅mcopy(Person)⋅((salry⋅dagger(salry))⊗(manag⋅dagger(manag)))⋅mmerge(Person)⋅name
+for stmt in insert_stmts
+  DBInterface.execute(db, stmt)
+end
 
-# Customer/employee relationship between employee and their manager
-formula = mcopy(Person)⋅(id(Person)⊗manag)⋅e_cust_conn
-query(f) = to_sql(make_query(schema, f))
+@testset "SQL From @program" begin
+  # This should get everyone whose manager is their own manager
+  f = @program schema (p::person) begin
+    m = manager(p)
+    m1 = manager(m)
+    dcounit{person}(m,m1)
+    return names(p)
+  end
 
-println(query(formula))
+  qp = Query(types, tables, f)
+  A = DBInterface.execute(db, sql(qp)) |> DataFrame
+  @test A isa DataFrame
+  @test ["Alice Smith",
+         "Bob Jones",
+         "John Doe"] == A[!,"full_name"]
 
-#conn = Connection("dbname=test_db")
-#statement = prepare(conn, schema, formula)
-#println(execute(conn, schema, formula))
-#println(execute(statement, ["ROW(1)"]))
-# get the salary of a person's manager
-# query(manag⋅salry) == "select (manager.id, salary.salary) from manager join salary on manager.manager == salary.id"
+  # This should get the name of each person and the salary of their manager
+  f = @program schema (p::person) begin
+    return names(p), salary(manager(p))
+  end
+
+  qp = Query(types, tables, f)
+  A = DBInterface.execute(db, sql(qp)) |> DataFrame
+  @test A isa DataFrame
+  @test ["Alice Smith",
+         "Bob Jones",
+         "Eve Johnson",
+         "John Doe"] == A[!,"full_name"]
+
+  @test [ 150000.0,
+          150000.0,
+          90000.0,
+          150000.0] == A[!,"salary"]
+end
+
+@testset "SQL From Formula" begin
+  # Formula Method Tests
+
+  # This should get everyone whose manager is their own manager
+  f = Δ(person)⋅((manager⋅Δ(person)⋅(id(person)⊗manager)⋅dcounit(person))⊗names)
+
+  qp = Query(types, tables, f)
+  A = DBInterface.execute(db, sql(qp)) |> DataFrame
+  @test A isa DataFrame
+  @test ["Alice Smith",
+         "Bob Jones",
+         "John Doe"] == A[!,"full_name"]
+
+  # This should get the name of each person and the salary of their manager
+  f = Δ(person)⋅(names⊗(manager⋅salary))
+
+  qp = Query(types, tables, f)
+  A = DBInterface.execute(db, sql(qp)) |> DataFrame
+  @test A isa DataFrame
+  @test ["Alice Smith",
+         "Bob Jones",
+         "Eve Johnson",
+         "John Doe"] == A[!,"full_name"]
+
+  @test [ 150000.0,
+          150000.0,
+          90000.0,
+          150000.0] == A[!,"salary"]
+end

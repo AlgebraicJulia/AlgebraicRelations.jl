@@ -186,7 +186,7 @@ sql(types_dict, tables, schema) = begin
   data_tables = map(collect(tables)) do (key,val)
     dom_names   = val[1]
     codom_names = val[2]
-    hom = schema.generators_by_name[Symbol(key)]
+    hom = generator(schema, Symbol(key))
 
     # Evaluate Dom
     fields = Array{String,1}()
