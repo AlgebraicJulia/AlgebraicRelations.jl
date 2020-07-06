@@ -1,13 +1,14 @@
 module SQL
 export sql, present_sql, to_sql
 using Catlab.Theories, Catlab.Present, Catlab.WiringDiagrams
-using AlgebraicRelations.QueryLib, AlgebraicRelations.SchemaLib
-import AlgebraicRelations.SchemaLib: Schema
+using AlgebraicRelations.QueryLib
 
 TypeToSql = Dict(String => "text",
                  Int64 => "int",
                  Float64 => "float4")
 
+# Generates a new array where all strings are unique. The new strings are based
+# off of the strings provided in the original array.
 uniquify(a::Array{String,1}) = begin
   a_n = Array{String,1}()
   # Fill a_n with unique values
@@ -27,6 +28,7 @@ uniquify(a::Array{String,1}) = begin
   return a_n
 end
 
+# Adds aliases for the SQL table names
 function add_aliases(names::Array{String,1})
   aliases = map(names) do name
               p_ind = findfirst(".", name)[1]
@@ -36,6 +38,8 @@ function add_aliases(names::Array{String,1})
   new_names = [n*" AS "*a for (n,a) in zip(names, aliases)]
   return new_names
 end
+
+# Converts a Julia datatype to its SQL equivalent
 function to_sql(t)
   if t isa DataType
     return TypeToSql[t]
@@ -43,6 +47,7 @@ function to_sql(t)
   return t
 end
 
+# Evaluates the connections between ports (primarily concerned with Junction nodes)
 function evaluate_ports(q::Query)
   wd = q.wd
   tables = q.tables
@@ -122,7 +127,7 @@ function evaluate_ports(q::Query)
   aliases, port_val
 end
 
-
+# Generates an SQL query from a provided Query object
 function sql(q::Query)::String
 
   tables = q.tables
@@ -166,7 +171,8 @@ function sql(q::Query)::String
   return select*from*condition
 end
 
-
+# Generates the SQL needed to generate the tables and types necessary for a
+# schema
 sql(types_dict, tables, schema) = begin
   primitives = map(collect(types_dict)) do (key,val)
     names = val[1]
@@ -236,7 +242,7 @@ sql(types_dict, tables, schema) = begin
 end
 
 
-# Need to generate a wrapper call around this to insert parameters
+# Generates a wrapper call around this to insert parameters
 # If the original query accepts a person's name (p_name) and returns
 # their manager's name (m_name) and the person's salary (salary), then
 # the wrapped query would look like this:

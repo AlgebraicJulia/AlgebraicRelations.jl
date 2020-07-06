@@ -1,16 +1,23 @@
 module Interface
   export init_tables, prepare, execute, Connection, format_form
   using Catlab
-  using AlgebraicRelations.SchemaLib, AlgebraicRelations.QueryLib, AlgebraicRelations.SQL
+  using AlgebraicRelations.QueryLib, AlgebraicRelations.SQL
   using LibPQ, DataFrames
   import LibPQ:
     Connection, Result, Statement
 
 
+  # init_tables:
+  # This function will initialize a database with the tables required for the
+  # given schema argument
+
   function init_tables(conn::Connection, types, tables, schema)
     st = sql(types, tables, schema)
     result = LibPQ.execute(conn, st)
   end
+
+  # upload_csv:
+  # This function uploads data from a CSV to the connected database
 
   function upload_csv(conn::Connection, table::String, filename::String)
     LibPQ.execute(conn, "COPY '$table' FROM '$filename' DELIMITER ',' CSV HEADER;")
@@ -27,11 +34,18 @@ module Interface
     Statement(conn, uid, query, res, length(q.wd.input_ports))
   end
 
+  # execute:
+  # This function gets the results running the provided query on the connected
+  # database
+
   function execute(conn::Connection, q::Query)::DataFrame
     query = sql(q)
     DataFrame(LibPQ.execute(conn, query))
   end
 
+  # execute(Statement, Array):
+  # This function runs a prepared SQL statement using the input array as
+  # arguments
   function execute(st::Statement, input::AbstractArray)::DataFrame
     DataFrame(LibPQ.execute(st, input))
   end

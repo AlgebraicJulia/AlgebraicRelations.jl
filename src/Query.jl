@@ -19,8 +19,6 @@ import Catlab.Programs: @program
 
 using AutoHashEquals
 
-import AlgebraicRelations.SchemaLib: Schema
-
 @auto_hash_equals struct Types
   ports::Ports
 end
@@ -30,6 +28,9 @@ end
 This structure holds the relationship graph between fields in a query
 
 # Fields
+- `types::Dict{Symbol, Tuple{Array{String,1}, Array{T,1} where T}}`:
+          The mapping between a type symbols and their fundamental types along
+          with the field names for those types if the SQL type is composite.
 - `tables::Dict{Symbol, Tuple{Array{String,1}, Array{String,1}}}`:
           The mapping between a table symbols and their column names for domain
           and codomain.
