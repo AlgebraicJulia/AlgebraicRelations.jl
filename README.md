@@ -2,11 +2,11 @@
 
 ![Tests](https://github.com/AlgebraicJulia/AlgebraicRelations.jl/workflows/Tests/badge.svg)
 
-AlgebraicRelations.jl is a Julia library built to provide an intuitive and elegant method for generating SQL queries. This package provides tooling for defining database schemas, generating query visualizations, and connecting directly up to a PostgreSQL server. This package is built on top of [Catlab.jl](https://github.com/epatters/Catlab.jl) which is the powerhouse behind its functions.
+AlgebraicRelations.jl is a Julia library built to provide an intuitive and elegant method for generating SQL queries. This package provides tooling for defining database schemas, generating query visualizations, and connecting directly up to a PostgreSQL server. This package is built on top of [Catlab.jl](https://github.com/AlgebraicJulia/Catlab.jl) which is the powerhouse behind its functions.
 
 ## Learning by Doing
 
-The functions of this library may be best explained by showing various examples of how it can be used. This will be shown in the steps of [Defining a Schema](#defining-a-schema), [Creating Queries](#creating-queries), and [Connecting to PostgreSQL](#connecting-to-postgresql).
+The functions of this library may be best explained by showing various examples of how it can be used. This will be done in the steps of [Defining a Schema](#defining-a-schema), [Creating Queries](#creating-queries), and [Connecting to PostgreSQL](#connecting-to-postgresql).
 
 ### Defining a Schema
 
@@ -119,3 +119,8 @@ which will get all of the above information for all employees.
 The `execute` function will return a `DataFrame` object (from the [`DataFrames.jl`](http://juliadata.github.io/DataFrames.jl/stable/) library)
 
 ## Theory
+Some excellent resources for understanding how Bicategories of Relations relate to SQL queries (and inspiriation for this library) are as follows: 
+* ["Knowledge Representation in Bicategories of Relations"](https://arxiv.org/abs/1706.00526)
+  * This work does an excellent job of elucidating operations on the Bicategories of Relations and how that relates to methods of knowledge representation like SQL
+* Category Theory for Scientists by Spivak
+  * While generally a very useful introduction to Category Theory, this book elaborates on the categorization of databases in Chapter 3 (in the online version)
