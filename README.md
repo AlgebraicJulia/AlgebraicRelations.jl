@@ -1,4 +1,4 @@
-# AlgebraicRelations.jl
+# <img src="docs/src/assets/logo.png" width="15%">   AlgebraicRelations.jl
 
 ![Tests](https://github.com/AlgebraicJulia/AlgebraicRelations.jl/workflows/Tests/badge.svg)
 
