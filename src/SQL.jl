@@ -179,17 +179,18 @@ function get_name(tables, r::UndirectedWiringDiagram, port)
   return "t$b.$port_name"
 end
 
-# Generates an SQL query from a provided Query object
+# Generates an SQL query from a provided Query object using the
+# UndirectedWiringDiagram
 function sql(q::Query{UndirectedWiringDiagram})::String
 
   tables = q.tables
   wd = q.wd
 
-  rel_statement = Array{String,1}()
-
 	# Define the join statement
   join_statement = ["$name AS t$i" for (i,name) in enumerate(wd.data.name)]
 
+  # Initialize space for the relations and the exposed ports
+  rel_statement = Array{String,1}()
   outer_ports = Array{String, 1}(undef, length(junction(wd, outer=true)))
 
 	# Iterate through all junctions to create the necessary equivalence statements
@@ -207,6 +208,7 @@ function sql(q::Query{UndirectedWiringDiagram})::String
       end
     end
 
+    # Evaluate any exposed ports at this junction
     out_junc = ports_with_junction(wd, j, outer=true)
     for d in out_junc
       outer_ports[d] = src
