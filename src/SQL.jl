@@ -48,7 +48,7 @@ function to_sql(t)
 end
 
 # Evaluates the connections between ports (primarily concerned with Junction nodes)
-function evaluate_ports(q::Query)
+function evaluate_ports(q::Query{WiringDiagram})
   wd = q.wd
   tables = q.tables
   aliases = Array{String,1}()
@@ -128,7 +128,7 @@ function evaluate_ports(q::Query)
 end
 
 # Generates an SQL query from a provided Query object
-function sql(q::Query)::String
+function sql(q::Query{WiringDiagram})::String
 
   tables = q.tables
   wd = q.wd
@@ -160,6 +160,60 @@ function sql(q::Query)::String
   codom_array = port_val[2][1]
 
   f_names = add_aliases(vcat(dom_array, codom_array))
+
+  select = "SELECT "*join(f_names, ", ")*"\n"
+  from = "FROM "*join(join_statement, ", ")*"\n"
+  condition = ";"
+  if length(condition) != 0
+    condition = "WHERE "*join(rel_statement, " AND ")*";"
+  end
+
+  return select*from*condition
+end
+
+function get_name(tables, r::UndirectedWiringDiagram, port)
+  b = box(r,port)
+  b_port = findall(x->x==port, ports(r,b))[1]
+  b_name = r.data.name[b]
+  port_name = vcat(tables[b_name]...)[b_port]
+  return "t$b.$port_name"
+end
+
+# Generates an SQL query from a provided Query object
+function sql(q::Query{UndirectedWiringDiagram})::String
+
+  tables = q.tables
+  wd = q.wd
+
+  rel_statement = Array{String,1}()
+
+	# Define the join statement
+  join_statement = ["$name AS t$i" for (i,name) in enumerate(wd.data.name)]
+
+  outer_ports = Array{String, 1}(undef, length(junction(wd, outer=true)))
+
+	# Iterate through all junctions to create the necessary equivalence statements
+  for j in junctions(wd)
+    # Evaluate internal connections
+    ports = ports_with_junction(wd,j)
+    length(ports) != 0 || throw(ArgumentError("Junction has no internal connections"))
+    src = get_name(tables, wd, ports[1])
+    for d in 2:length(ports)
+      dst = get_name(tables, wd, ports[d])
+
+      if src != dst && !(dst*"="*src in rel_statement) &&
+                       !(src*"="*dst in rel_statement)
+        push!(rel_statement, src*"="*dst)
+      end
+    end
+
+    out_junc = ports_with_junction(wd, j, outer=true)
+    for d in out_junc
+      outer_ports[d] = src
+    end
+  end
+
+  f_names = add_aliases(outer_ports)
 
   select = "SELECT "*join(f_names, ", ")*"\n"
   from = "FROM "*join(join_statement, ", ")*"\n"
@@ -253,7 +307,7 @@ end
 # FROM names AS t3, manager AS t4, salary AS t5
 # WHERE t3.person=t4.person AND t3.person=t5.person
 # AND t3.p_name = ROW($1, $2);
-present_sql(q::Query, uid::String)::String = begin
+present_sql(q::Query{WiringDiagram}, uid::String)::String = begin
   types = q.types
   tables = q.tables
   wd = q.wd
@@ -318,4 +372,6 @@ present_sql(q::Query, uid::String)::String = begin
   res = "PREPARE \"$uid\" ($(join(type_arr,","))) AS\n$select$from$condition;"
   return res
 end
+
+
 end

@@ -136,3 +136,42 @@ end
           90000.0,
           150000.0] == A[!,"salary"]
 end
+
+@testset "SQL From Relation" begin
+  # Relation Method Tests
+
+  # This should get everyone whose manager is their own manager
+  f = @relation (p, n) where (p::person, n::full_name, m::person, m1::person) begin
+    manager(p,m)
+    manager(m, m1)
+    manager(m1, m)
+    names(p, n)
+  end
+
+  qp = Query(types, tables, f)
+  A = DBInterface.execute(db, sql(qp)) |> DataFrame
+  @test A isa DataFrame
+  @test ["Alice Smith",
+         "Bob Jones",
+         "John Doe"] == A[!,"full_name"]
+
+  # This should get the name of each person and the salary of their manager
+  f = @relation (p, n, s) where (p::person, n::full_name, s::F, m::person) begin
+    manager(p,m)
+    salary(m,s)
+    names(p,n)
+  end
+
+  qp = Query(types, tables, f)
+  A = DBInterface.execute(db, sql(qp)) |> DataFrame
+  @test A isa DataFrame
+  @test ["Alice Smith",
+         "Bob Jones",
+         "Eve Johnson",
+         "John Doe"] == A[!,"full_name"]
+
+  @test [ 150000.0,
+          150000.0,
+          90000.0,
+          150000.0] == A[!,"salary"]
+end
