@@ -8,10 +8,11 @@ AutoHashEquals = "15f4f7f2-30c1-5605-9d31-71845cf9641f"
 Catlab = "134e5e36-593f-5add-ad60-77f754baafbe"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 LibPQ = "194296ae-ab2e-5f79-8cd4-7183a0a5a0d1"
+Octo = "16905944-f982-529b-abb2-b839f98f160b"
 
 [compat]
 AutoHashEquals = "0.2.0"
-Catlab = "0.7.2"
+Catlab = "^0.8"
 DataFrames = "0.21.0"
 LibPQ = "1.4.0"
 julia = "1.0"
