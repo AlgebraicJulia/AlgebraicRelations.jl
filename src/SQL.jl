@@ -1,6 +1,6 @@
 module SQL
 export sql, present_sql, to_sql
-using Catlab.Theories, Catlab.Present, Catlab.WiringDiagrams
+using Catlab.Theories, Catlab.Present, Catlab.WiringDiagrams, Catlab.CategoricalAlgebra
 using AlgebraicRelations.QueryLib
 
 TypeToSql = Dict(String => "text",
@@ -174,7 +174,7 @@ end
 function get_name(tables, r::UndirectedWiringDiagram, port)
   b = box(r,port)
   b_port = findall(x->x==port, ports(r,b))[1]
-  b_name = r.data.name[b]
+  b_name = subpart(r, :name)[b]
   port_name = vcat(tables[b_name]...)[b_port]
   return "t$b.$port_name"
 end
@@ -187,7 +187,7 @@ function sql(q::Query{UndirectedWiringDiagram})::String
   wd = q.wd
 
 	# Define the join statement
-  join_statement = ["$name AS t$i" for (i,name) in enumerate(wd.data.name)]
+  join_statement = ["$name AS t$i" for (i,name) in enumerate(subpart(wd, :name))]
 
   # Initialize space for the relations and the exposed ports
   rel_statement = Array{String,1}()
