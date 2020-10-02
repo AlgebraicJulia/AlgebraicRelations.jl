@@ -1,4 +1,3 @@
-# here is an example
 using Catlab, Catlab.Theories, Catlab.Present
 using AlgebraicRelations.QueryLib, AlgebraicRelations.SQL,
       AlgebraicRelations.Interface;
