@@ -30,7 +30,7 @@ Workplace = SchemaType(WorkplaceSchema)
 f = Workplace()
 
 db = SQLite.DB()
-splt_stmts = split(to_sql_schema(f), "\n")
+splt_stmts = split(generate_schema_sql(f), "\n")
 
 @testset "Generate DB Schema" begin
   for stmt in splt_stmts

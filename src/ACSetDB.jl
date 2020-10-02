@@ -2,7 +2,7 @@ module ACSetDB
   using Catlab: @present
 	using Catlab.Present
   using Catlab.CategoricalAlgebra.CSets
-  export TheorySQL, SchemaType, to_sql_schema, @present, get_fields
+  export TheorySQL, SchemaType, generate_schema_sql, @present, get_fields
 
   @present TheorySQL(FreeSchema) begin
     Int64::Data
@@ -16,7 +16,7 @@ module ACSetDB
 
   const AbstractSQL = AbstractACSetType(TheorySQL)
  
-	function generate_schema(schema::AbstractACSet)
+	function generate_schema_sql(schema::AbstractACSet)
 	    queries = map(collect(get_fields(schema))) do (name, col)
 	        cols = ["$n $t" for (n,t) in col]
 	        "CREATE TABLE $name ( $(name)ID PRIMARY KEY, $(join(cols, ", ")))"
