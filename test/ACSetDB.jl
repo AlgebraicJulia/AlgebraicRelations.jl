@@ -37,4 +37,3 @@ splt_stmts = split(generate_schema_sql(f), "\n")
     @test DBInterface.execute(db, stmt) isa SQLite.Query
   end
 end
-

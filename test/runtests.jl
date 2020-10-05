@@ -7,3 +7,7 @@ using Test
 @testset "ACSetDB" begin
   include("ACSetDB.jl")
 end
+
+@testset "ACSetQueries" begin
+  include("ACSetQueries.jl")
+end
