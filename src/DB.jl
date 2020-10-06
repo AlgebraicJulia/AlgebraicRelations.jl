@@ -1,4 +1,4 @@
-module ACSetDB
+module DB
   using Catlab: @present
   using Catlab.Present
   using Catlab.CategoricalAlgebra.CSets

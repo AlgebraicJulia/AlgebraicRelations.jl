@@ -1,11 +1,11 @@
-module ACSetQueries
+module Queries
   using Catlab: @present
   import Catlab.Programs.RelationalPrograms: TheoryTypedRelationDiagram
   import Catlab.Programs.RelationalPrograms: parse_relation_diagram
   using Catlab.Graphics
   using Catlab.WiringDiagrams
   using Catlab.CategoricalAlgebra.CSets
-  using ..ACSetDB
+  using ..DB
 
   # Used for the redefinition of copy_parts!
   using Catlab.Theories: Schema, FreeSchema, dom, codom,
@@ -57,7 +57,7 @@ module ACSetQueries
   end
 
   macro query(schema, exprs...)
-    Expr(:call, GlobalRef(ACSetQueries, :parse_query_statement),
+    Expr(:call, GlobalRef(Queries, :parse_query_statement),
                 esc(schema), exprs)
   end
 

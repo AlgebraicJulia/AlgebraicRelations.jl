@@ -1,4 +1,4 @@
-using AlgebraicRelations.ACSetDB
+using AlgebraicRelations.DB
 using SQLite
 
 @present WorkplaceSchema <: TheorySQL begin

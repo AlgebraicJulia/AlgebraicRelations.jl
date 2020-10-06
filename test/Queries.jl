@@ -1,5 +1,5 @@
-using AlgebraicRelations.ACSetDB
-using AlgebraicRelations.ACSetQueries
+using AlgebraicRelations.DB
+using AlgebraicRelations.Queries
 using SQLite
 using DataFrames
 

@@ -1,7 +1,7 @@
 module Interface
   export init_tables, prepare, execute, Connection, format_form
   using Catlab
-  using AlgebraicRelations.QueryLib, AlgebraicRelations.SQL
+  using ..DB, ..Queries
   using LibPQ, DataFrames
   import LibPQ:
     Connection, Result, Statement
@@ -11,8 +11,8 @@ module Interface
   # This function will initialize a database with the tables required for the
   # given schema argument
 
-  function init_tables(conn::Connection, types, tables, schema)
-    st = sql(types, tables, schema)
+  function init_tables(conn::Connection, schema)
+    st = generate_schema_sql(schema)
     result = LibPQ.execute(conn, st)
   end
 
@@ -29,9 +29,9 @@ module Interface
 
   function prepare(conn::Connection, q::Query)::Statement
     uid = LibPQ.unique_id(conn)
-    query = present_sql(q, uid)
+    query, n_args = to_prepared_sql(q, uid)
     res = LibPQ.execute(conn, query)
-    Statement(conn, uid, query, res, length(q.wd.input_ports))
+    Statement(conn, uid, query, res, n_args)
   end
 
   # execute:
@@ -39,7 +39,7 @@ module Interface
   # database
 
   function execute(conn::Connection, q::Query)::DataFrame
-    query = sql(q)
+    query = to_sql(q)
     DataFrame(LibPQ.execute(conn, query))
   end
 

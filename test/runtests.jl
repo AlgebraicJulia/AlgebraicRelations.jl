@@ -4,10 +4,10 @@ using Test
 #  include("AlgebraicRelations.jl")
 #end
 
-@testset "ACSetDB" begin
-  include("ACSetDB.jl")
+@testset "DB" begin
+  include("DB.jl")
 end
 
-@testset "ACSetQueries" begin
-  include("ACSetQueries.jl")
+@testset "Queries" begin
+  include("Queries.jl")
 end
