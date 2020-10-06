@@ -2,6 +2,8 @@ module ACSetQueries
   using Catlab: @present
   import Catlab.Programs.RelationalPrograms: TheoryTypedRelationDiagram
   import Catlab.Programs.RelationalPrograms: parse_relation_diagram
+  using Catlab.Graphics
+  using Catlab.WiringDiagrams
   using Catlab.CategoricalAlgebra.CSets
   using ..ACSetDB
 
@@ -10,7 +12,11 @@ module ACSetQueries
     CatDesc, CatDescType, AttrDesc, AttrDescType, SchemaType,
     ob_num, hom_num, data_num, attr_num, dom_num, codom_num
 
-  export TheoryQuery, Query, @query, to_sql
+  export TheoryQuery, Query, @query, to_sql, draw_query
+
+  const SQLOperators = Dict(:< => ("<", [:first, :second]),
+                            :> => (">", [:first, :second]),
+                            :(==) => ("=", [:first, :second]))
 
   @present TheoryQuery <: TheoryTypedRelationDiagram begin
     field::Attr(Port, Name)
@@ -36,7 +42,11 @@ module ACSetQueries
       port_type = p[3]
 
       box_name = box_names[box]
-      port_name = port_names[box_name][port_per_box[i]][1]
+      if box_name in keys(SQLOperators)
+        SQLOperators[box_name][2][port_per_box[i]]
+      else
+        port_names[box_name][port_per_box[i]][1]
+      end
     end
     set_subparts!(q, 1:nparts(q, :Port), field=port_names)
     q
@@ -83,31 +93,53 @@ module ACSetQueries
 
 
   function to_sql(q::Query)
-    table_names = subpart(q, :name)
+
+    box_names = subpart(q, :name)
+    table_inds = findall(x -> !(x in keys(SQLOperators)), box_names)
+    op_inds = findall(x -> x in keys(SQLOperators), box_names)
+
     outer_juncs = subpart(q, :outer_junction)
     port_info = subparts(q, [:box, :junction, :field])
     junctions = zeros(Int, nparts(q, :Junction))
 
+    # Construct the conditions by iterating through each port
     conditions = Array{String,1}()
     for (i, p) in enumerate(port_info)
-      prev_pind = junctions[p[2]]
-      if prev_pind == 0
-        junctions[p[2]] = i
-      else
-        p_port = port_info[prev_pind]
-        push!(conditions, "t$(p[1]).$(p[3])=t$(p_port[1]).$(p_port[3])")
+      if p[1] in table_inds
+        prev_pind = junctions[p[2]]
+        if prev_pind == 0
+          junctions[p[2]] = i
+        else
+          p_port = port_info[prev_pind]
+          push!(conditions, "t$(p[1]).$(p[3])=t$(p_port[1]).$(p_port[3])")
+        end
       end
     end
 
-    alias = map(enumerate(table_names)) do (i,n) "$n AS t$i" end
+    # Construct the operator relations
+    append!(conditions, map(op_inds) do i
+              p_inf = port_info[junctions[subpart(q, ports(q,i), :junction)]]
+              op = SQLOperators[box_names[i]][1]
+              "t$(p_inf[1][1]).$(p_inf[1][3])$(op)t$(p_inf[2][1]).$(p_inf[2][3])"
+            end)
+
+    # Construct the aliases for each table
+    alias = map(table_inds) do i "$(box_names[i]) AS t$i" end
+
+    # Construct the field output selection statement
     selector_alias = uniquify(map(i -> "$(port_info[junctions[i]][3])",outer_juncs))
     selectors = map(enumerate(outer_juncs)) do (i,j)
       port = port_info[junctions[j]]
       "t$(port[1]).$(port[3]) AS $(selector_alias[i])"
     end
+
     return "SELECT $(join(selectors, ", "))\nFROM $(join(alias, ", "))\nWHERE $(join(conditions, " AND "))"
   end
 
+  function draw_query(q)
+    to_graphviz(q; box_labels=:name, junction_labels=:junction_type,
+                   port_labels=true, edge_attrs=Dict(:len => "0.8"))
+  end
 
   # Replication of CSet functionality
   # TODO: Find best way to copy objects and attributes between CSets of
