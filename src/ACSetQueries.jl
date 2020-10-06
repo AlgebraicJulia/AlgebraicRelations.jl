@@ -12,11 +12,15 @@ module ACSetQueries
     CatDesc, CatDescType, AttrDesc, AttrDescType, SchemaType,
     ob_num, hom_num, data_num, attr_num, dom_num, codom_num
 
-  export TheoryQuery, Query, @query, to_sql, draw_query
+  export TheoryQuery, Query, @query, to_sql, draw_query, to_prepared_sql
 
-  const SQLOperators = Dict(:< => ("<", [:first, :second]),
-                            :> => (">", [:first, :second]),
-                            :(==) => ("=", [:first, :second]))
+  const SQLOperators = Dict(:<    => ("<", [:first, :second]),
+                            :>    => (">", [:first, :second]),
+                            :(==) => ("=", [:first, :second]),
+                            :<=   => ("<=", [:first, :second]),
+                            :>=   => (">=", [:first, :second]),
+                            :(!=) => ("<>", [:first, :second]),
+                           )
 
   @present TheoryQuery <: TheoryTypedRelationDiagram begin
     field::Attr(Port, Name)
@@ -101,6 +105,19 @@ module ACSetQueries
     outer_juncs = subpart(q, :outer_junction)
     port_info = subparts(q, [:box, :junction, :field])
     junctions = zeros(Int, nparts(q, :Junction))
+    variables = subpart(q, :variable)
+    prepared_junctions = findall(x -> string(x)[1] == '_', variables)
+
+    junctions[prepared_junctions] = nparts(q, :Port) .+ (1:length(prepared_junctions))
+
+    field_name(port) = begin
+      if port > length(port_info)
+        "\$$(port - length(port_info))"
+      else
+        p = port_info[port]
+        "t$(p[1]).$(p[3])"
+      end
+    end
 
     # Construct the conditions by iterating through each port
     conditions = Array{String,1}()
@@ -110,30 +127,36 @@ module ACSetQueries
         if prev_pind == 0
           junctions[p[2]] = i
         else
-          p_port = port_info[prev_pind]
-          push!(conditions, "t$(p[1]).$(p[3])=t$(p_port[1]).$(p_port[3])")
+          push!(conditions, "$(field_name(i))=$(field_name(prev_pind))")
         end
       end
     end
 
     # Construct the operator relations
     append!(conditions, map(op_inds) do i
-              p_inf = port_info[junctions[subpart(q, ports(q,i), :junction)]]
+              p_ind = junctions[subpart(q, ports(q,i), :junction)]
               op = SQLOperators[box_names[i]][1]
-              "t$(p_inf[1][1]).$(p_inf[1][3])$(op)t$(p_inf[2][1]).$(p_inf[2][3])"
+              "$(field_name(p_ind[1]))$(op)$(field_name(p_ind[2]))"
             end)
 
     # Construct the aliases for each table
     alias = map(table_inds) do i "$(box_names[i]) AS t$i" end
 
     # Construct the field output selection statement
-    selector_alias = uniquify(map(i -> "$(port_info[junctions[i]][3])",outer_juncs))
+    selector_alias = uniquify(map(i -> "$(variables[i])",outer_juncs))
     selectors = map(enumerate(outer_juncs)) do (i,j)
-      port = port_info[junctions[j]]
-      "t$(port[1]).$(port[3]) AS $(selector_alias[i])"
+      "$(field_name(junctions[j])) AS $(selector_alias[i])"
     end
 
     return "SELECT $(join(selectors, ", "))\nFROM $(join(alias, ", "))\nWHERE $(join(conditions, " AND "))"
+  end
+
+  function to_prepared_sql(q::Query, uid::String)
+    junc_types = map(x -> typeToSQL(x), subpart(q, :junction_type))
+    prepared_junctions = findall(x -> string(x)[1] == '_', subpart(q, :variable))
+
+    return "PREPARE \"$uid\" ($(join(junc_types[prepared_junctions], ","))) AS\n$(to_sql(q))",
+           length(prepared_junctions)
   end
 
   function draw_query(q)

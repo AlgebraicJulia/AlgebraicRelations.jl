@@ -2,8 +2,13 @@ module ACSetDB
   using Catlab: @present
   using Catlab.Present
   using Catlab.CategoricalAlgebra.CSets
-  export TheorySQL, SchemaType, generate_schema_sql, @present, get_fields
+  export TheorySQL, SchemaType, generate_schema_sql, @present, get_fields, TypeToSQL, typeToSQL
 
+  TypeToSQL = Dict("String" => "text",
+                   "Int64" => "int",
+                   "Float64" => "float4")
+
+  typeToSQL(x) = TypeToSQL[string(x)]
   @present TheorySQL(FreeSchema) begin
     Int64::Data
     Float64::Data
@@ -18,7 +23,7 @@ module ACSetDB
 
   function generate_schema_sql(schema::AbstractACSet)
     queries = map(collect(get_fields(schema))) do (name, col)
-      cols = ["$n $t" for (n,t) in col]
+      cols = ["$n $(typeToSQL(t))" for (n,t) in col]
       "CREATE TABLE $name ($(join(cols, ", ")))"
     end
     join(queries, ";\n")
@@ -31,6 +36,7 @@ module ACSetDB
 
       # Get the column names and types
       col_names, types = eltype(table).parameters
+      col_names = map(x -> Symbol(split(string(x), r"_\d+_")[end]), col_names)
       fields[table_name] = map(zip(col_names,types.parameters)) do (n,t)
         (n, t)
       end
