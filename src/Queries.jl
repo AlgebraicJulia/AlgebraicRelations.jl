@@ -148,7 +148,13 @@ module Queries
       "$(field_name(junctions[j])) AS $(selector_alias[i])"
     end
 
-    return "SELECT $(join(selectors, ", "))\nFROM $(join(alias, ", "))\nWHERE $(join(conditions, " AND "))"
+    query = "SELECT $(join(selectors, ", "))\nFROM $(join(alias, ", "))"
+
+    if length(conditions) > 0
+      query = string(query, "\nWHERE $(join(conditions, " AND "))")
+    end
+
+    query
   end
 
   function to_prepared_sql(q::Query, uid::String)
