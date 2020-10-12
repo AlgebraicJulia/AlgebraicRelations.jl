@@ -26,7 +26,7 @@ module DB
       cols = ["$n $(typeToSQL(t))" for (n,t) in col]
       "CREATE TABLE $name ($(join(cols, ", ")))"
     end
-    join(queries, ";\n")
+    string(join(queries, ";\n"), ";")
   end
 
   function get_fields(schema::AbstractACSet)

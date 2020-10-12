@@ -40,7 +40,9 @@ module Queries
     port_names = get_fields(schema)
     port_per_box = port_indices(wd)
 
-    port_names = map(enumerate(subparts(wd, [:box, :junction, :port_type]))) do (i,p)
+    type_map = Dict{Symbol, Symbol}()
+
+    names = map(enumerate(subparts(wd, [:box, :junction, :port_type]))) do (i,p)
       box = p[1]
       junction = p[2]
       port_type = p[3]
@@ -49,10 +51,20 @@ module Queries
       if box_name in keys(SQLOperators)
         SQLOperators[box_name][2][port_per_box[i]]
       else
-        port_names[box_name][port_per_box[i]][1]
+        field = port_names[box_name][port_per_box[i]]
+        if port_type in keys(type_map)
+          type_map[port_type] == Symbol(field[2]) ||
+            error(string("Type $port_type has no consistent mapping",
+                         " ($(type_map[port_type]) and $(field[2]))"))
+        else
+          type_map[port_type] = Symbol(field[2])
+        end
+        field[1]
       end
     end
-    set_subparts!(q, 1:nparts(q, :Port), field=port_names)
+    set_subparts!(q, 1:nparts(q, :Port), field=names, port_type=[type_map[p] for p in subpart(q, :port_type)])
+    set_subparts!(q, 1:nparts(q, :Junction), junction_type=[type_map[p] for p in subpart(q, :junction_type)])
+    set_subparts!(q, 1:nparts(q, :OuterPort), outer_port_type=[type_map[p] for p in subpart(q, :outer_port_type)])
     q
   end
 
@@ -166,8 +178,7 @@ module Queries
   end
 
   function draw_query(q)
-    to_graphviz(q; box_labels=:name, junction_labels=:junction_type,
-                   port_labels=true, edge_attrs=Dict(:len => "0.8"))
+    to_graphviz(q; box_labels=:name, port_labels=:field, edge_attrs=Dict(:len => "0.8"))
   end
 
   # Replication of CSet functionality
