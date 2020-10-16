@@ -6,11 +6,14 @@ module Workflows
   using Catlab.Theories
   using Catlab.Graphics
   using Catlab.Theories.FreeSchema: Attr, Data
+  using Petri
+  using LabelledArrays
   import Catlab.Theories: FreeSymmetricMonoidalCategory, ⊗
   import Catlab.Programs: @program
 
   export wf_to_schema, @program, draw_workflow, FreeSymmetricMonoidalCategory,
-         add_product!, add_products!, add_process!, add_processes!, Workflow, ⊗
+         add_product!, add_products!, add_process!, add_processes!, Workflow, ⊗,
+         draw_schema
 
   function Workflow()
     return Presentation(FreeSymmetricMonoidalCategory)
@@ -81,10 +84,39 @@ module Workflows
 
     @present p <: TheorySQL begin end
     add_generators!(p, gens)
-    p
+    SchemaType(p)
   end
 
-  function draw_workflow(p)
-    to_graphviz(p)
+  function draw_schema(p::Presentation; kw...)
+    ob_names = Symbol.(generators(p, :Ob))
+    hom_names = Symbol.(generators(p, :Hom))
+    hom_dict = Dict{Symbol, Tuple{LArray, LArray}}()
+    for hom in generators(p, :Hom)
+      # Evaluate Dom
+      d = Array{Symbol,1}()
+      if eltype(dom(hom).args) <: GATExpr
+        d = Symbol.(dom(hom).args)
+      else
+        d = [Symbol(dom(hom))]
+      end
+      dom_name_count=Dict([(i,count(x->x==i,d)) for i in d])
+      # Operate on Codom
+      if eltype(codom(hom).args) <: GATExpr
+        d = Symbol.(codom(hom).args)
+      else
+        d = [Symbol(codom(hom))]
+      end
+      codom_name_count=Dict([(i,count(x->x==i,d)) for i in d])
+      dom_lv = LVector(NamedTuple{Tuple(keys(dom_name_count))}(values(dom_name_count)))
+      codom_lv = LVector(NamedTuple{Tuple(keys(codom_name_count))}(values(codom_name_count)))
+      hom_dict[Symbol(hom)] = (dom_lv, codom_lv)
+    end
+    hom_lv = LVector(NamedTuple{Tuple(keys(hom_dict))}(values(hom_dict)))
+    schema_p = Petri.Model(ob_names, hom_lv)
+    Graph(schema_p)
+  end
+
+  function draw_workflow(p; kw...)
+    to_graphviz(p; orientation=LeftToRight, kw...)
   end
 end

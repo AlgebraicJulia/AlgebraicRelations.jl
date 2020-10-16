@@ -5,18 +5,21 @@ module DB
   export TheorySQL, SchemaType, generate_schema_sql, @present, get_fields, TypeToSQL, typeToSQL
 
   TypeToSQL = Dict("String" => "text",
+                   "Int" => "int",
                    "Int64" => "int",
-                   "Float64" => "float4")
+                   "Real" => "real",
+                   "Bool" => "boolean")
 
   typeToSQL(x) = TypeToSQL[string(x)]
   @present TheorySQL(FreeSchema) begin
-    Int64::Data
-    Float64::Data
+    Int::Data
+    Real::Data
     String::Data
+    Bool::Data
   end;
 
   function SchemaType(present::Presentation)
-    ACSetType(present){Int64, Float64, String}
+    ACSetType(present){Int, Real, String, Bool}
   end
 
   const AbstractSQL = AbstractACSetType(TheorySQL)
@@ -43,4 +46,9 @@ module DB
     end
     fields
   end
+
+  # TODO: Maybe add in a way to get_fields from a Presentation?
+  #       Allows more convenience when working with workflows,
+  #       but doesn't allow you to take advantage of the CSet
+  #       structure
 end

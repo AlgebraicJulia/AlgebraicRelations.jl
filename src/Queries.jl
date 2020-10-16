@@ -177,8 +177,8 @@ module Queries
            length(prepared_junctions)
   end
 
-  function draw_query(q)
-    to_graphviz(q; box_labels=:name, port_labels=:field, edge_attrs=Dict(:len => "0.8"))
+  function draw_query(q; kw...)
+    to_graphviz(q; box_labels=:name, junction_labels=:variable, kw...)
   end
 
   # Replication of CSet functionality
