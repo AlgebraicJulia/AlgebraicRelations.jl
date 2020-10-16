@@ -2,6 +2,7 @@ module Queries
   using Catlab: @present
   import Catlab.Programs.RelationalPrograms: TheoryTypedRelationDiagram
   import Catlab.Programs.RelationalPrograms: parse_relation_diagram
+  using Catlab.Programs.RelationalPrograms
   using Catlab.Graphics
   using Catlab.WiringDiagrams
   using Catlab.CategoricalAlgebra.CSets
@@ -12,7 +13,7 @@ module Queries
     CatDesc, CatDescType, AttrDesc, AttrDescType, SchemaType,
     ob_num, hom_num, data_num, attr_num, dom_num, codom_num
 
-  export TheoryQuery, Query, @query, to_sql, draw_query, to_prepared_sql
+  export TheoryQuery, Query, @query, to_sql, draw_query, to_prepared_sql, infer!
 
   const SQLOperators = Dict(:<    => ("<", [:first, :second]),
                             :>    => (">", [:first, :second]),
@@ -24,17 +25,84 @@ module Queries
 
   @present TheoryQuery <: TheoryTypedRelationDiagram begin
     field::Attr(Port, Name)
+    Comparison::Ob
+    comp_port1::Hom(Comparison, Port)
+    comp_port2::Hom(Comparison, Port)
+    # comp_port1⋅port_type == comp_port2⋅port_type
+    # port_type == junction⋅junction_type
+    # subpart(q, :port_type) == subpart(q, subpart(q, :junction), :junction_type)
   end
 
   const Query = ACSetType(TheoryQuery,
                           index=[:box, :junction, :outer_junction, :field],
                           unique_index=[:variable])
 
-  Query() = Query{Symbol, Symbol, Symbol}()
+  NullableSym = Union{Symbol, Nothing}
+  Query() = Query{NullableSym, NullableSym, NullableSym}()
+
+
+
+  function infer!(wd, rels::Array{Tuple{Array{Symbol,1}, Array{Symbol,1}},1}; max_iter=2*length(rels))
+    # Perform multiple steps to fill in chains of relations
+    for i in 1:max_iter
+      inf_step = [infer_indiv!(wd, rel) for rel in rels]
+      if all([!s[2] for s in inf_step])
+        if all([s[1] for s in inf_step])
+          # Successfully defined all values to be defined
+          return true
+        end
+        # Did not define all values, but stopped changing
+        throw(ErrorException("Not all relations were able to be defined. Original system insufficiently defined"))
+      end
+    end
+    return false
+  end
+
+  function infer_indiv!(wd, rel::Tuple{Array{Symbol}, Array{Symbol}})
+    a = subpart(wd, rel[1][1])
+
+    for i in 2:length(rel[1])
+      if i == length(rel[1])
+        a = view(subpart(wd, rel[1][i]), a)
+      else
+        a = subpart(wd, a, rel[1][i])
+      end
+    end
+
+    b = subpart(wd, rel[2][1])
+    for i in 2:length(rel[2])
+      if i == length(rel[2])
+        b = view(subpart(wd, rel[2][i]), b)
+      else
+        b = subpart(wd, b, rel[2][i])
+      end
+    end
+    changed = false
+    length(a) == length(b) || throw(DimensionMismatch("The arguments of $(rel[1])==$(rel[2]) have different lengths, $(length(a)) and $(length(b))"))
+    is_defined = map(1:length(a)) do i
+      if a[i] == nothing
+        if b[i] == nothing
+          return false
+        else
+          a[i] = b[i]
+          changed = true
+        end
+      else
+        if b[i] == nothing
+          b[i] = a[i]
+          changed = true
+        else
+          a[i] == b[i] || throw(DimensionMismatch("The arguments of $(rel[1])==$(rel[2]) have inconsistent values at index $i, $(a[i]) and $(b[i])"))
+        end
+      end
+      true
+    end
+    return all(is_defined), changed
+  end
 
   function Query(schema, wd)
     q = Query()
-    copy_parts!(q, wd, (Junction=:, Box=:, OuterPort=:, Port=:))
+    copy_parts!(q, wd)
 
     box_names = subpart(wd, :name)
     port_names = get_fields(schema)
@@ -42,29 +110,31 @@ module Queries
 
     type_map = Dict{Symbol, Symbol}()
 
-    names = map(enumerate(subparts(wd, [:box, :junction, :port_type]))) do (i,p)
+    for b in 1:nparts(wd, :Box)
+      if subpart(wd, b, :name) in keys(SQLOperators)
+        ports = incident(wd, b, :box)
+        add_part!(q, :Comparison, comp_port1=ports[1], comp_port2=ports[2])
+      end
+    end
+
+    names = map(enumerate(subparts(wd, [:box, :junction]))) do (i,p)
       box = p[1]
       junction = p[2]
-      port_type = p[3]
 
       box_name = box_names[box]
       if box_name in keys(SQLOperators)
-        SQLOperators[box_name][2][port_per_box[i]]
+        set_subparts!(q, i, field=SQLOperators[box_name][2][port_per_box[i]], port_type=nothing)
       else
         field = port_names[box_name][port_per_box[i]]
-        if port_type in keys(type_map)
-          type_map[port_type] == Symbol(field[2]) ||
-            error(string("Type $port_type has no consistent mapping",
-                         " ($(type_map[port_type]) and $(field[2]))"))
-        else
-          type_map[port_type] = Symbol(field[2])
-        end
+        set_subparts!(q, i, field=field[1], port_type=Symbol(field[2]))
         field[1]
       end
     end
-    set_subparts!(q, 1:nparts(q, :Port), field=names, port_type=[type_map[p] for p in subpart(q, :port_type)])
-    set_subparts!(q, 1:nparts(q, :Junction), junction_type=[type_map[p] for p in subpart(q, :junction_type)])
-    set_subparts!(q, 1:nparts(q, :OuterPort), outer_port_type=[type_map[p] for p in subpart(q, :outer_port_type)])
+    set_subpart!(q, :junction_type, nothing)
+    set_subpart!(q, :outer_port_type, nothing)
+    infer!(q, [([:port_type],[:junction, :junction_type]),
+               ([:outer_junction, :junction_type],[:outer_port_type]),
+               ([:comp_port1,:port_type],[:comp_port2,:port_type])]);
     q
   end
 
@@ -146,7 +216,7 @@ module Queries
 
     # Construct the operator relations
     append!(conditions, map(op_inds) do i
-              p_ind = junctions[subpart(q, ports(q,i), :junction)]
+              p_ind = junctions[subpart(q, incident(q,i,:box), :junction)]
               op = SQLOperators[box_names[i]][1]
               "$(field_name(p_ind[1]))$(op)$(field_name(p_ind[2]))"
             end)
@@ -178,7 +248,9 @@ module Queries
   end
 
   function draw_query(q; kw...)
-    to_graphviz(q; box_labels=:name, junction_labels=:variable, kw...)
+    uwd = TypedRelationDiagram{NullableSym, NullableSym, NullableSym}()
+    copy_parts!(uwd, q)
+    to_graphviz(uwd; box_labels=:name, junction_labels=:variable, kw...)
   end
 
   # Replication of CSet functionality
@@ -186,56 +258,5 @@ module Queries
   #       different types
   function subparts(acs::ACSet, names::Array{Symbol,1})
     collect(zip([subpart(acs, name) for name in names]...))
-  end
-
-  function copy_parts!(acs::ACSet, from::ACSet, parts::NamedTuple{types}) where types
-    parts = map(types, parts) do type, part
-      part == (:) ? (1:nparts(from, type)) : part
-    end
-    _copy_parts!(acs, from, NamedTuple{types}(parts))
-  end
-
-  @generated function _copy_parts!(acs, from::T, parts::NamedTuple{types}) where
-      {types,CD,AD,Ts,Idx,T <: ACSet{CD,AD,Ts,Idx}}
-    obnums = ob_num.(CD, types)
-    in_obs, out_homs = Symbol[], Tuple{Symbol,Symbol,Symbol}[]
-    for (hom, dom, codom) in zip(CD.hom, CD.dom, CD.codom)
-      if dom ∈ obnums && codom ∈ obnums
-        push!(in_obs, CD.ob[codom])
-        push!(out_homs, (hom, CD.ob[dom], CD.ob[codom]))
-      end
-    end
-    in_obs = Tuple(unique!(in_obs))
-    quote
-      newparts = NamedTuple{$types}(tuple($(map(types) do type
-        :(_copy_parts_data!(acs, from, Val($(QuoteNode(type))), parts.$type))
-      end...)))
-      partmaps = NamedTuple{$in_obs}(tuple($(map(in_obs) do type
-        :(Dict{Int,Int}(zip(parts.$type, newparts.$type)))
-      end...)))
-      for (name, dom, codom) in $(Tuple(out_homs))
-        for (p, newp) in zip(parts[dom], newparts[dom])
-          q = subpart(from, p, name)
-          newq = get(partmaps[codom], q, nothing)
-          if !isnothing(newq)
-            set_subpart!(acs, newp, name, newq)
-          end
-        end
-      end
-      newparts
-    end
-  end
-
-  @generated function _copy_parts_data!(acs, from::T, ::Val{ob}, parts) where
-      {CD,AD,T<:ACSet{CD,AD},ob}
-    attrs = collect(filter(attr -> dom(AD, attr) == ob, AD.attr))
-    quote
-      newparts = add_parts!(acs, $(QuoteNode(ob)), length(parts))
-      $(Expr(:block, map(attrs) do attr
-         :(set_subpart!(acs, newparts, $(QuoteNode(attr)),
-                        from.tables.$ob.$attr[parts]))
-        end...))
-      newparts
-    end
   end
 end

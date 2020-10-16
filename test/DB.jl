@@ -4,13 +4,13 @@ using SQLite
 @present WorkplaceSchema <: TheorySQL begin
   # Data tables
   employee::Ob
-  emp_data::Attr(employee, Int64)
+  emp_data::Attr(employee, Int)
   
   name::Ob
   name_data::Attr(name, String)
   
   salary::Ob
-  sal_data::Attr(salary, Float64)
+  sal_data::Attr(salary, Real)
   
   # Relation tables
   manager::Ob

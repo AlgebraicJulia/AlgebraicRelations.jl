@@ -6,8 +6,8 @@ using DataFrames
 @present WorkplaceSchema <: TheorySQL begin
   # Data tables
   employees::Ob
-  employees_1_person::Attr(employees, Int64)
-  employees_2_id::Attr(employees, Int64)
+  employees_1_person::Attr(employees, Int)
+  employees_2_id::Attr(employees, Int)
 
   names::Ob
   names_1_person::Hom(names, employees)
@@ -15,7 +15,7 @@ using DataFrames
 
   salary::Ob
   salary_1_person::Hom(salary, employees)
-  salary_2_salary::Attr(salary, Float64)
+  salary_2_salary::Attr(salary, Real)
 
   # Relation tables
   manager::Ob
@@ -25,7 +25,7 @@ using DataFrames
   relation::Ob
   relation_1_person1::Hom(relation, employees)
   relation_2_person2::Hom(relation, employees)
-  relation_3_relationship::Attr(relation, Float64)
+  relation_3_relationship::Attr(relation, Real)
 end;
 
 Workplace = SchemaType(WorkplaceSchema)
@@ -64,7 +64,7 @@ end
 
 
 @testset "Generate SQL Queries" begin
-  q = @query schema (p, n) where (p::Int64, n::String, m::Int64, m1::Int64) begin
+  q = @query schema (p, n) where (p, n, m, m1) begin
     manager(p,m)
     manager(m, m1)
     manager(m1, m)
