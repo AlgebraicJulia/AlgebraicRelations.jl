@@ -6,7 +6,7 @@ module Workflows
   using Catlab.Theories
   using Catlab.Graphics
   using Catlab.Theories.FreeSchema: Attr, Data
-  using Petri
+  using AlgebraicPetri
   using LabelledArrays
   import Catlab.Theories: FreeSymmetricMonoidalCategory, ⊗
   import Catlab.Programs: @program
@@ -90,30 +90,25 @@ module Workflows
   function draw_schema(p::Presentation; kw...)
     ob_names = Symbol.(generators(p, :Ob))
     hom_names = Symbol.(generators(p, :Hom))
-    hom_dict = Dict{Symbol, Tuple{LArray, LArray}}()
+    hom_dict = Dict{Symbol, Tuple}()
     for hom in generators(p, :Hom)
       # Evaluate Dom
-      d = Array{Symbol,1}()
-      if eltype(dom(hom).args) <: GATExpr
-        d = Symbol.(dom(hom).args)
+      dom_v = if eltype(dom(hom).args) <: GATExpr
+        Tuple(Symbol.(dom(hom).args))
       else
-        d = [Symbol(dom(hom))]
+        Symbol(dom(hom))
       end
-      dom_name_count=Dict([(i,count(x->x==i,d)) for i in d])
       # Operate on Codom
-      if eltype(codom(hom).args) <: GATExpr
-        d = Symbol.(codom(hom).args)
+      codom_v = if eltype(codom(hom).args) <: GATExpr
+        Tuple(Symbol.(codom(hom).args))
       else
-        d = [Symbol(codom(hom))]
+        Symbol(codom(hom))
       end
-      codom_name_count=Dict([(i,count(x->x==i,d)) for i in d])
-      dom_lv = LVector(NamedTuple{Tuple(keys(dom_name_count))}(values(dom_name_count)))
-      codom_lv = LVector(NamedTuple{Tuple(keys(codom_name_count))}(values(codom_name_count)))
-      hom_dict[Symbol(hom)] = (dom_lv, codom_lv)
+
+      hom_dict[Symbol(hom)] = (dom_v, codom_v)
     end
-    hom_lv = LVector(NamedTuple{Tuple(keys(hom_dict))}(values(hom_dict)))
-    schema_p = Petri.Model(ob_names, hom_lv)
-    Graph(schema_p)
+    schema_ap = LabelledPetriNet(ob_names, hom_dict...)
+    Graph(schema_ap)
   end
 
   function draw_workflow(p; kw...)
