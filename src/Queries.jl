@@ -7,6 +7,7 @@ module Queries
   using Catlab.WiringDiagrams
   using Catlab.CategoricalAlgebra.CSets
   using ..DB
+  using ..Functors
 
   # Used for the redefinition of copy_parts!
   using Catlab.Theories: Schema, FreeSchema, dom, codom,
@@ -100,42 +101,43 @@ module Queries
     return all(is_defined), changed
   end
 
-  function Query(schema, wd)
-    q = Query()
-    copy_parts!(q, wd)
-
-    box_names = subpart(wd, :name)
+  function RelToQuery(schema)
     port_names = get_fields(schema)
-    port_per_box = port_indices(wd)
+    function ob_to_sql(rel::UntypedRelationDiagram)
+      q = Query()
+      copy_parts!(q, rel)
+      name = subpart(rel, 1, :name)
 
-    type_map = Dict{Symbol, Symbol}()
+      # Set junction and outer_port types (these will be inferred from schema types)
+      set_subpart!(q, :outer_port_type, nothing)
+      set_subpart!(q, :junction_type, nothing)
 
-    for b in 1:nparts(wd, :Box)
-      if subpart(wd, b, :name) in keys(SQLOperators)
-        ports = incident(wd, b, :box)
+      # add comparison references for later type-inference
+      if name in keys(SQLOperators)
+        ports = incident(rel, 1, :box)
         add_part!(q, :Comparison, comp_port1=ports[1], comp_port2=ports[2])
-      end
-    end
-
-    names = map(enumerate(subparts(wd, [:box, :junction]))) do (i,p)
-      box = p[1]
-      junction = p[2]
-
-      box_name = box_names[box]
-      if box_name in keys(SQLOperators)
-        set_subparts!(q, i, field=SQLOperators[box_name][2][port_per_box[i]], port_type=nothing)
+        set_subparts!(q, 1:2, field=SQLOperators[box_name][2][1:2], port_type=[nothing, nothing])
       else
-        field = port_names[box_name][port_per_box[i]]
-        set_subparts!(q, i, field=field[1], port_type=Symbol(field[2]))
-        field[1]
+        fields = [port_names[name][i][1] for i in 1:nparts(q, :Port)]
+        types = [Symbol(port_names[name][i][2]) for i in 1:nparts(q, :Port)]
+        set_subparts!(q, 1:nparts(q, :Port), field=fields, port_type=types)
       end
+      q
     end
-    set_subpart!(q, :junction_type, nothing)
-    set_subpart!(q, :outer_port_type, nothing)
-    infer!(q, [([:port_type],[:junction, :junction_type]),
-               ([:outer_junction, :junction_type],[:outer_port_type]),
-               ([:comp_port1,:port_type],[:comp_port2,:port_type])]);
-    q
+
+    toQuery = Functor(ob_to_sql, Query)
+
+    function toSQL(rel::UntypedRelationDiagram)
+      q = toQuery(rel)
+      infer!(q, [([:port_type],[:junction, :junction_type]),
+                 ([:outer_junction, :junction_type],[:outer_port_type]),
+                 ([:comp_port1,:port_type],[:comp_port2,:port_type])]);
+      q
+    end
+  end
+
+  function Query(schema, wd)
+    RelToQuery(schema)(wd)
   end
 
   macro query(schema, exprs...)
