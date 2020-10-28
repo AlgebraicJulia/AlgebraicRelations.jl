@@ -23,14 +23,15 @@ end
 function _functor(F::Functor, uwd::RelationDiagram)
   # Base Case: UWD of 1 box
   if nparts(uwd, :Box) == 1
-      return F.ob(uwd)
+    return F.ob(uwd)
   end
   # TODO: Make a more generalized version so that we don't have
   # to arbitrarily keep track of OuterPort order
 
   # Split box, apply functor, then re-compose
   op, cosp, l_uwd, r_uwd = F.split(uwd)
-  return F.comp(op, cosp, _functor(F, l_uwd), _functor(F,r_uwd))
+  f_comp = F.comp(op, cosp, _functor(F, l_uwd), _functor(F,r_uwd))
+  return f_comp
 end
 
 
@@ -76,7 +77,9 @@ function gen_compose(OpenType)
     ab = compose(open_a, open_b).cospan.apex
 
     # Bring the resulting junctions back to original order
-    reorder_part!(ab, :Junction, a_inv)
+    a_completed = zeros(Int,length(a_inv))
+    a_completed[a_inv] = 1:length(a_inv)
+    reorder_part!(ab, :Junction, a_completed)
     reorder_part!(ab, :OuterPort, op_map)
     return ab
   end
