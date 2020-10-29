@@ -19,14 +19,14 @@ module Workflows
     return Presentation(FreeSymmetricMonoidalCategory)
   end
 
-  function add_product!(p::Presentation, field::Tuple{Symbol, Symbol})
+  function add_product!(p::Presentation, field::Tuple{Symbol, <:Type})
     ob = Ob(FreeSymmetricMonoidalCategory, field[1])
-    push!(ob.args, field[2])
+    push!(ob.args, Symbol(field[2]))
     add_generator!(p, ob)
     return ob
   end
 
-  function add_products!(p::Presentation, fields::Array{Tuple{Symbol, Symbol}})
+  function add_products!(p::Presentation, fields::Array{<:Tuple{Symbol, Type}})
     return map(field->add_product!(p, field), fields)
   end
 

@@ -11,3 +11,7 @@ end
 @testset "Queries" begin
   include("Queries.jl")
 end
+
+@testset "Workflow" begin
+  include("Workflows.jl")
+end
