@@ -1,33 +1,32 @@
-module Workflows
+module Presentations
 
   using ..DB
 
   using Catlab
   using Catlab.Theories
   using Catlab.Graphics
+  using Catlab.Present: Presentation
   using Catlab.Theories.FreeSchema: Attr, Data
   using AlgebraicPetri
   using LabelledArrays
   import Catlab.Theories: FreeSymmetricMonoidalCategory, ⊗
   import Catlab.Programs: @program
 
-  export wf_to_schema, @program, draw_workflow, FreeSymmetricMonoidalCategory,
-         add_product!, add_products!, add_process!, add_processes!, Workflow, ⊗,
+  export present_to_schema, @program, draw_workflow, FreeSymmetricMonoidalCategory,
+         add_types!, add_type!, add_process!, add_processes!, Presentation, ⊗,
          draw_schema
 
-  function Workflow()
-    return Presentation(FreeSymmetricMonoidalCategory)
-  end
+  Presentation() = Presentation(FreeSymmetricMonoidalCategory)
 
-  function add_product!(p::Presentation, field::Tuple{Symbol, <:Type})
+  function add_type!(p::Presentation, field::Tuple{Symbol, <:Type})
     ob = Ob(FreeSymmetricMonoidalCategory, field[1])
     push!(ob.args, Symbol(field[2]))
     add_generator!(p, ob)
     return ob
   end
 
-  function add_products!(p::Presentation, fields::Array{<:Tuple{Symbol, Type}})
-    return map(field->add_product!(p, field), fields)
+  function add_types!(p::Presentation, fields::Array{<:Tuple{Symbol, Type}})
+    return map(field->add_type!(p, field), fields)
   end
 
   function add_process!(p::Presentation, hom::Tuple{Symbol, GATExpr, GATExpr})
@@ -40,7 +39,7 @@ module Workflows
     return map(hom->add_process!(p, hom), homs)
   end
 
-  function wf_to_schema(wf::Presentation)
+  function present_to_schema(wf::Presentation)
     gens = Array{GATExpr, 1}()
     tables = Dict{Symbol, GATExpr}()
     sym_app(s::Symbol, suffix::String) = Symbol(string(s, suffix))
