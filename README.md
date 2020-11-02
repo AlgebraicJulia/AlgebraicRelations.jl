@@ -3,8 +3,8 @@
 ![Tests](https://github.com/AlgebraicJulia/AlgebraicRelations.jl/workflows/Tests/badge.svg)
 
 AlgebraicRelations.jl is a Julia library built to provide an intuitive and
-elegant method for generating and querying a database meant to store data from
-a workflow. This package provides tooling for defining database schemas,
+elegant method for generating and querying a scientific database. This 
+package provides tooling for defining database schemas,
 generating query visualizations, and connecting directly up to a PostgreSQL
 server. This package is built on top of
 [Catlab.jl](https://github.com/AlgebraicJulia/Catlab.jl) which is the
@@ -21,10 +21,10 @@ Schema](#defining-a-schema), [Creating Queries](#creating-queries), and
 
 Within this library, we define database schemas based on the *presentation* of a
 workflow (more generally, the presentation of a symmetric monoidal category).
-The presentation of a workflow includes the *data types* of products in the
-workflow (objects in an SMC) and the *processes* that transform these products
+The presentation of a workflow includes the **data types** of products in the
+workflow (objects in an SMC) and the **processes** that transform these products
 (homomorphisms in an SMC). We will give an example of defining the schema of a
-traditional computer vision workflow, This involves extracting images from a
+traditional computer vision workflow. This involves extracting images from a
 file, performing a test/train split on images, training a neural network on
 images, and finally evaluating a network on images. This example is also
 presented in [this notebook](examples/ml_workflow_demo/ml_demo.ipynb).
@@ -32,7 +32,7 @@ presented in [this notebook](examples/ml_workflow_demo/ml_demo.ipynb).
 #### Defining Types
 
 In order to define types for the presentation, we need to provide the name of
-the type (e.g. `Files` for compressed files of images) and then the Julia
+the type (e.g. `File` for compressed files of images) and then the Julia
 datatype which can store this type (The filename can be stored uniquely as a
 `String`). The definition of all types that we will need for our example is as
 follows:
@@ -42,8 +42,8 @@ follows:
 present = Presentation()
 
 # Add types to presentation
-Files, Images, NeuralNet,
-Accuracy, Metadata = add_types!(present, [(:Files, String),
+File, Images, NeuralNet,
+Accuracy, Metadata = add_types!(present, [(:File, String),
                                           (:Images, String),
                                           (:NeuralNet, String),
                                           (:Accuracy, Real),
@@ -54,17 +54,17 @@ Accuracy, Metadata = add_types!(present, [(:Files, String),
 
 To define processes that operate on these types, we need three pieces of
 information. First, we need the name of the processes (`extract` for the
-process that extracts images from files), the input types (`Files` for the file
+process that extracts images from files), the input types (`File` for the file
 to extract) and the output types (`Images` for the images which were
 extracted). The symbol `⊗` (monoidal product) joins two types, allowing for multiple types
 in the inputs and outputs of processes. To the schema, this means nothing more than that,
-for the process `train` there are two types need for the input, the first of
+for the process `train` there are two objects need for the input, the first of
 type `NeuralNet` and the second of type `Images`.
 
 ```julia
 # Add Processes to presentation
 extract, split, train,
-evaluate = add_processes!(present, [(:extract, Files, Images),
+evaluate = add_processes!(present, [(:extract, File, Images),
                                     (:split, Images, Images⊗Images),
                                     (:train, NeuralNet⊗Images, NeuralNet⊗Metadata),
                                     (:evaluate, NeuralNet⊗Images, Accuracy⊗Metadata)]);
@@ -80,7 +80,7 @@ print(generate_schema_sql(TrainDB()))
 ```
 ```sql
 CREATE TABLE evaluate (NeuralNet1 text, Images2 text, Accuracy3 real, Metadata4 text);
-CREATE TABLE extract (Files1 text, Images2 text);
+CREATE TABLE extract (File1 text, Images2 text);
 CREATE TABLE split (Images1 text, Images2 text, Images3 text);
 CREATE TABLE train (NeuralNet1 text, Images2 text, NeuralNet3 text, Metadata4 text);
 ```
@@ -125,8 +125,8 @@ We then can prepare statements and run them with arguments like:
 statement = prepare(conn,q)
 execute(statement, [0.6])
 ```
-which will obtain all of the information from the previous query for the
-objects realting to an accuracy of greater than 0.6.
+which will obtain all of the rows from the previous query which contain
+an accuracy of greater than 0.6.
 
 The `execute` function will return a `DataFrame` object (from the
 [`DataFrames.jl`](http://juliadata.github.io/DataFrames.jl/stable/) library)
