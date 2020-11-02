@@ -2,6 +2,7 @@ using AlgebraicRelations.DB
 using AlgebraicRelations.Queries
 using SQLite
 using DataFrames
+using Catlab
 
 @present WorkplaceSchema <: TheorySQL begin
   # Data tables
@@ -76,4 +77,5 @@ end
   @test ["Alice Smith",
          "Bob Jones",
          "John Doe"] == A[!, "n"]
+  @test draw_query(q) isa Catlab.Graphics.Graphviz.Graph
 end

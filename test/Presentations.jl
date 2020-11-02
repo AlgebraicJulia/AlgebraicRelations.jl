@@ -19,6 +19,8 @@ extract, split_im, train, evaluate = add_processes!(wf, [(:extract, Files, Image
                                                          (:evaluate, NeuralNet⊗Images, Accuracy⊗Metadata)]);
 # Convert to Schema
 TrainDB = present_to_schema(wf);
-draw_schema(wf)
+g = draw_schema(wf)
 
-@test typeof(wf) <: Catlab.Present.Presentation
+@test wf isa Catlab.Present.Presentation
+@test TrainDB <: Catlab.CategoricalAlgebra.ACSet
+@test g isa Catlab.Graphics.Graphviz.Graph

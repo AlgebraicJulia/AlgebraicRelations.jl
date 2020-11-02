@@ -13,13 +13,14 @@ module DB
   typeToSQL(x) = TypeToSQL[string(x)]
   @present TheorySQL(FreeSchema) begin
     Int::Data
+    Int64::Data
     Real::Data
     String::Data
     Bool::Data
   end;
 
   function SchemaType(present::Presentation)
-    ACSetType(present){Int, Real, String, Bool}
+    ACSetType(present){Int, Int64, Real, String, Bool}
   end
 
   const AbstractSQL = AbstractACSetType(TheorySQL)
