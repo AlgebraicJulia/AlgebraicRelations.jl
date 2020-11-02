@@ -8,7 +8,6 @@ module Presentations
   using Catlab.Present: Presentation
   using Catlab.Theories.FreeSchema: Attr, Data
   using AlgebraicPetri
-  using LabelledArrays
   import Catlab.Theories: FreeSymmetricMonoidalCategory, ⊗
   import Catlab.Programs: @program
 
