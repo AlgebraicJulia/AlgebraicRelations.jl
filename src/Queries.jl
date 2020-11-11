@@ -6,8 +6,9 @@ module Queries
   using Catlab.Graphics
   using Catlab.WiringDiagrams
   using Catlab.CategoricalAlgebra.CSets
+  using Catlab.CategoricalAlgebra
+  using Catlab.CategoricalAlgebra.FinSets
   using ..DB
-  using ..Functors
 
   # Used for the redefinition of copy_parts!
   using Catlab.Theories: Schema, FreeSchema, dom, codom,
@@ -34,14 +35,45 @@ module Queries
     # subpart(q, :port_type) == subpart(q, subpart(q, :junction), :junction_type)
   end
 
+
+
   const Query = ACSetType(TheoryQuery,
-                          index=[:box, :junction, :outer_junction, :field],
-                          unique_index=[:variable])
+                          index=[:box, :junction, :outer_junction, :field, :variable])
+
+  const OpenQueryOb, OpenQuery = OpenACSetTypes(Query, :Junction)
 
   NullableSym = Union{Symbol, Nothing}
   Query() = Query{NullableSym, NullableSym, NullableSym}()
 
+  """    Open(dynam::DynamUWD, bundling=nothing)
 
+  This function converts a closed dynamic system to an open dynamical system
+  (structured multicospan). If a `bundling` is not provided, then every outer
+  port will have its own cospan.
+
+  """
+  function Open(query_orig::Query, bundling=nothing)
+    query = deepcopy(query_orig)
+    cur_jncs = nparts(query, :Junction)
+    cur_ports = nparts(query, :OuterPort)
+
+    # Create cospan legs for each outer_junction
+    legs = map(i -> FinFunction([subpart(query, i, :outer_junction)], cur_jncs), 1:cur_ports)
+
+    # The cospans are now keeping track of composition, so we remove redundant
+    # information stored in the outerports (this is restored in the closeDynam
+    # function
+    rem_parts!(query, :OuterPort, 1:nparts(query, :OuterPort))
+
+    # Create the OpenDynam object
+    op_query = OpenQuery{NullableSym, NullableSym, NullableSym}(query, legs...)
+
+    # Bundle legs if `bundling` provided
+    if !isnothing(bundling)
+      op_query = bundle_legs(op_query, bundling)
+    end
+    op_query
+  end
 
   function infer!(wd, rels::Array{Tuple{Array{Symbol,1}, Array{Symbol,1}},1}; max_iter=2*length(rels))
     # Perform multiple steps to fill in chains of relations
@@ -101,43 +133,26 @@ module Queries
     return all(is_defined), changed
   end
 
-  function RelToQuery(schema)
-    port_names = get_fields(schema)
-    function ob_to_sql(rel::UntypedRelationDiagram)
-      q = Query()
-      copy_parts!(q, rel)
-      name = subpart(rel, 1, :name)
+  function RelToQuery(rel, schema)
 
-      # Set junction and outer_port types (these will be inferred from schema types)
-      set_subpart!(q, :outer_port_type, nothing)
-      set_subpart!(q, :junction_type, nothing)
+    transform = schema_to_dict(schema)
+    q = oapply(rel, transform)
 
-      # add comparison references for later type-inference
-      if name in keys(SQLOperators)
-        ports = incident(rel, 1, :box)
-        add_part!(q, :Comparison, comp_port1=ports[1], comp_port2=ports[2])
-        set_subparts!(q, 1:2, field=SQLOperators[name][2][1:2], port_type=[nothing, nothing])
-      else
-        fields = [port_names[name][i][1] for i in 1:nparts(q, :Port)]
-        types = [Symbol(port_names[name][i][2]) for i in 1:nparts(q, :Port)]
-        set_subparts!(q, 1:nparts(q, :Port), field=fields, port_type=types)
-      end
-      q
-    end
+    set_subpart!(q.cospan.apex, :variable, subpart(rel, :variable))
+    add_parts!(q.cospan.apex, :OuterPort, nparts(rel, :OuterPort),
+                                          outer_junction=subpart(rel, :outer_junction),
+                                          outer_port_type=nothing)
+    infer!(q.cospan.apex, [([:port_type],[:junction, :junction_type]),
+               ([:outer_junction, :junction_type],[:outer_port_type]),
+               ([:comp_port1,:port_type],[:comp_port2,:port_type])]);
 
-    toQuery = Functor(ob_to_sql, Query)
-
-    function toSQL(rel::UntypedRelationDiagram)
-      q = toQuery(rel)
-      infer!(q, [([:port_type],[:junction, :junction_type]),
-                 ([:outer_junction, :junction_type],[:outer_port_type]),
-                 ([:comp_port1,:port_type],[:comp_port2,:port_type])]);
-      q
-    end
+    q.cospan.apex
   end
 
+
+
   function Query(schema, wd)
-    RelToQuery(schema)(wd)
+    RelToQuery(wd, schema)
   end
 
   macro query(schema, exprs...)
@@ -253,6 +268,40 @@ module Queries
     uwd = TypedRelationDiagram{NullableSym, NullableSym, NullableSym}()
     copy_parts!(uwd, q)
     to_graphviz(uwd; box_labels=:name, junction_labels=:variable, kw...)
+  end
+
+  function schema_to_dict(schema)
+    port_names = get_fields(schema)
+
+    sym_to_q = Dict{Symbol, OpenQuery}()
+
+    for name in keys(SQLOperators)
+      new_q = Query()
+      add_parts!(new_q, :Junction, 2, junction_type=nothing, variable=nothing)
+      add_part!(new_q, :Box, name=name)
+      add_parts!(new_q, :Port, 2, box=1, junction=[1,2],
+                 field=SQLOperators[name][2], port_type=[nothing, nothing])
+      add_part!(new_q, :Comparison, comp_port1=1, comp_port2=2)
+      add_parts!(new_q, :OuterPort, 2, outer_junction=[1,2], outer_port_type=nothing)
+      sym_to_q[name] = Open(new_q)
+    end
+
+    for name in keys(port_names)
+      fields = first.(port_names[name])
+      types = Symbol.(getindex.(port_names[name], 2))
+
+      new_q = Query()
+      add_part!(new_q, :Box, name=name)
+      add_parts!(new_q, :Junction, length(fields), junction_type=nothing, variable=nothing)
+      add_parts!(new_q, :Port, length(fields), box=1,
+                                               junction=1:length(fields),
+                                               field=fields,
+                                               port_type=types)
+      add_parts!(new_q, :OuterPort, length(fields), outer_junction=1:length(fields),
+                                                   outer_port_type=nothing)
+      sym_to_q[name] = Open(new_q)
+    end
+    sym_to_q
   end
 
   # Replication of CSet functionality
