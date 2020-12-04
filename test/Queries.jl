@@ -30,10 +30,10 @@ using Catlab
 end;
 
 Workplace = SchemaType(WorkplaceSchema)
-schema = Workplace()
+schema = Schema(Queries.schema_to_dict(Workplace()))
 
 db = SQLite.DB()
-splt_stmts = split(generate_schema_sql(schema), "\n")
+splt_stmts = split(generate_schema_sql(Workplace()), "\n")
 
 @testset "Generate DB Schema" begin
   for stmt in splt_stmts
