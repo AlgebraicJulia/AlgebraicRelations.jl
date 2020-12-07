@@ -190,7 +190,7 @@ function _reorder_part!(acs::ACSet{CD,AD,Ts,Idxed}, ::Val{ob},
         unset_data_index!(acs.indices[attr], junc_attrs[i][attr], i)
     end
   end
-  set_subparts!(acs, 1:last_part, junc_dict)
+  set_subparts!(acs, 1:last_part, (; junc_dict...))
 end
 
 # Copied in from CSetDataStructures in Catlab
