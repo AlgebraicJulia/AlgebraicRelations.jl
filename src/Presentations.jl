@@ -8,12 +8,15 @@ module Presentations
   using Catlab.Present: Presentation
   using Catlab.Theories.FreeSchema: Attr, Data
   using AlgebraicPetri
+  using Catlab.WiringDiagrams.DirectedWiringDiagrams
   import Catlab.Theories: FreeSymmetricMonoidalCategory, ⊗
   import Catlab.Programs: @program
+  using Catlab.CategoricalAlgebra
+  using Dagger
 
   export present_to_schema, @program, draw_workflow, FreeSymmetricMonoidalCategory,
          add_types!, add_type!, add_process!, add_processes!, Presentation, ⊗,
-         draw_schema
+         draw_schema, evaluate
 
   Presentation() = Presentation(FreeSymmetricMonoidalCategory)
 
@@ -112,4 +115,47 @@ module Presentations
   function draw_workflow(p; kw...)
     to_graphviz(p; orientation=LeftToRight, kw...)
   end
+
+  function evaluate(dwd::WiringDiagram, funcs::Dict{Symbol, <:Function},
+                     input_vals::Array)
+    graph = dwd.graph
+    g_inputs = [wire.source.port for wire in subpart(graph, incident(graph, 1, :src),
+                                                     :wire)]
+    g_outputs = incident(graph, 2, :tgt)
+    g_out_ports = [wire.target.port for wire in subpart(graph,g_outputs,:wire)]
+    g_out_ports[g_out_ports] .= g_outputs
+
+    values = Array{Thunk, 1}(undef, nparts(graph, :E))
+    values[incident(graph, 1, :src)] .= [delayed(x->x)(input_vals[i]) for i in g_inputs]
+
+    evaluated = fill(false, nparts(graph, :V))
+    available = fill(false, nparts(graph, :E))
+    evaluated[1:2] .= true
+    available[incident(graph, 1, :src)] .= true
+
+    while !all(evaluated)
+      mod = false;
+      for i in 3:nparts(graph, :V)
+        inputs = incident(graph, i, :tgt)
+        outputs = incident(graph, i, :src)
+        out_ports = [wire.source.port for wire in subpart(graph,
+                                                          outputs,
+                                                          :wire)]
+        in_ports = [wire.target.port for wire in subpart(graph,inputs,:wire)]
+        in_ports[in_ports] .= inputs
+        if !evaluated[i] && all(available[inputs])
+          func = delayed(funcs[subpart(graph, i, :box).value])(values[in_ports]...)
+          values[outputs] .= [delayed(x->x[i])(func) for i in out_ports]
+          evaluated[i] = true
+          available[outputs] .= true
+          mod = true;
+        end
+      end
+      if !mod
+          error("Not all boxes are able to be evaluated")
+      end
+    end
+    return collect(delayed((x...)->x)(values[g_out_ports]...))
+  end
+
 end
