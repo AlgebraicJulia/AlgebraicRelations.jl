@@ -2,6 +2,7 @@ module Functors
 
 using Catlab
 using Catlab.Theories
+using Catlab.Theories: attr
 using Catlab.Programs.RelationalPrograms
 using Catlab.CategoricalAlgebra
 using Catlab.CategoricalAlgebra.FinSets
@@ -157,9 +158,9 @@ reorder_part!(acs::ACSet, type::Symbol, order::Array{Int, 1}) =
 
 function _reorder_part!(acs::ACSet{CD,AD,Ts,Idxed}, ::Val{ob},
                                order::Array{Int, 1}) where {CD,AD,Ts,Idxed,ob}
-  in_homs = filter(hom -> codom(CD, hom) == ob, CD.hom)
-  indexed_out_homs = filter(hom -> dom(CD, hom) == ob && hom ∈ Idxed, CD.hom)
-  indexed_attrs = filter(attr -> dom(AD, attr) == ob && attr ∈ Idxed, AD.attr)
+  in_homs = filter(c_hom -> codom(CD, c_hom) == ob, hom(CD))
+  indexed_out_homs = filter(c_hom -> dom(CD, c_hom) == ob && c_hom ∈ Idxed, hom(CD))
+  indexed_attrs = filter(c_attr -> dom(AD, c_attr) == ob && c_attr ∈ Idxed, attr(AD))
   last_part = length(acs.tables[ob])
 
 
