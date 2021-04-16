@@ -15,6 +15,8 @@ module Presentations
          add_types!, add_type!, add_process!, add_processes!, Presentation, ⊗,
          draw_schema
 
+  hasprop(o, p) = p in propertynames(o)
+
   Presentation() = Presentation(FreeSymmetricMonoidalCategory)
 
   function add_type!(p::Presentation, field::Tuple{Symbol, <:Type})
@@ -52,7 +54,7 @@ module Presentations
           append!(sym_array, get_syms(i))
         end
         return sym_array
-      elseif hasproperty(g, :args)
+      elseif hasprop(g, :args)
         return get_syms(g.args)
       end
     end
