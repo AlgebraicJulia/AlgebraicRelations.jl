@@ -1,19 +1,20 @@
 module Presentations
 
   using ..DB
+  import ..DB: @db_schema
 
   using Catlab
   using Catlab.Theories
   using Catlab.Graphics
   using Catlab.Present: Presentation
-  using Catlab.Theories.FreeSchema: Attr, Data
+  using Catlab.Theories.FreeSchema: Attr
   using AlgebraicPetri
   import Catlab.Theories: FreeSymmetricMonoidalCategory, ⊗
   import Catlab.Programs: @program
 
   export present_to_schema, @program, draw_workflow, FreeSymmetricMonoidalCategory,
          add_types!, add_type!, add_process!, add_processes!, Presentation, ⊗,
-         draw_schema
+         draw_schema, @db_schema, @present_to_schema
 
   hasprop(o, p) = p in propertynames(o)
 
@@ -40,7 +41,11 @@ module Presentations
     return map(hom->add_process!(p, hom), homs)
   end
 
-  function present_to_schema(wf::Presentation)
+  macro present_to_schema(head)
+    present_to_schema(head.args[1], eval(GlobalRef(Main, head.args[2])))
+  end
+
+  function present_to_schema(sch_name::Symbol, wf::Presentation)
     gens = Array{GATExpr, 1}()
     tables = Dict{Symbol, GATExpr}()
     sym_app(s::Symbol, suffix::String) = Symbol(string(s, suffix))
@@ -84,7 +89,7 @@ module Presentations
 
     @present p <: TheorySQL begin end
     add_generators!(p, gens)
-    SchemaType(p)
+    :($(esc(:(@db_schema $(sch_name)($p)))))
   end
 
   function draw_schema(p::Presentation; kw...)

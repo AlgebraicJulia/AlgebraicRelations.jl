@@ -2,7 +2,8 @@ module DB
   using Catlab: @present
   using Catlab.Present
   using Catlab.CategoricalAlgebra.CSets
-  export TheorySQL, SchemaType, generate_schema_sql, @present, get_fields, TypeToSQL, typeToSQL
+  using Catlab.CSetDataStructures: struct_acset
+  export TheorySQL, generate_schema_sql, @present, get_fields, TypeToSQL, typeToSQL, @db_schema, AbstractSQL
 
   TypeToSQL = Dict("String" => "text",
                    "Int" => "int",
@@ -12,20 +13,25 @@ module DB
 
   typeToSQL(x) = TypeToSQL[string(x)]
   @present TheorySQL(FreeSchema) begin
-    Int::Data
-    Int64::Data
-    Real::Data
-    String::Data
-    Bool::Data
+    Int::AttrType
+    Int64::AttrType
+    Real::AttrType
+    String::AttrType
+    Bool::AttrType
   end;
 
-  function SchemaType(present::Presentation)
-    ACSetType(present){Int, Int64, Real, String, Bool}
+  @abstract_acset_type AbstractSQL
+
+  # TODO: This should be replacable with a cleaner method
+  macro db_schema(head)
+    struct_name = gensym()
+    quote
+      $(esc(:eval))(struct_acset($(Meta.quot(struct_name)), AbstractSQL, $(esc(head.args[2]))))
+      $(esc(head.args[1]))() = $(esc(struct_name)){$(esc(Int)), $(esc(Int)), $(esc(Real)), $(esc(String)), $(esc(Bool))}()
+    end
   end
 
-  const AbstractSQL = AbstractACSetType(TheorySQL)
-
-  function generate_schema_sql(schema::AbstractACSet)
+  function generate_schema_sql(schema::AbstractSQL)
     queries = map(collect(get_fields(schema))) do (name, col)
       cols = ["$n $(typeToSQL(t))" for (n,t) in col]
       "CREATE TABLE $name ($(join(cols, ", ")))"
@@ -33,15 +39,16 @@ module DB
     string(join(queries, ";\n"), ";")
   end
 
-  function get_fields(schema::AbstractACSet)
+  function get_fields(schema::AbstractSQL)
     fields = Dict{Symbol, Array{Tuple{Symbol, Type},1}}()
-    for (name, table) in pairs(schema.tables)
+    for (name, table) in pairs(tables(schema))
       table_name = name
 
       # Get the column names and types
-      col_names, types = eltype(table).parameters
+      col_names = propertynames(table)
+      types = eltype.([schema[c] for c in col_names])
       col_names = map(x -> Symbol(split(string(x), r"_\d+_")[end]), col_names)
-      fields[table_name] = map(zip(col_names,types.parameters)) do (n,t)
+      fields[table_name] = map(zip(col_names,types)) do (n,t)
         (n, t)
       end
     end

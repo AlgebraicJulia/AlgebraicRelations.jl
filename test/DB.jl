@@ -26,7 +26,7 @@ using SQLite
   sali::Hom(income, salary)
 end;   
 
-Workplace = SchemaType(WorkplaceSchema)
+@db_schema Workplace(WorkplaceSchema)
 f = Workplace()
 
 db = SQLite.DB()
