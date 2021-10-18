@@ -1,8 +1,7 @@
 module Queries
   using Catlab: @present
-  import Catlab.Programs.RelationalPrograms: TheoryTypedRelationDiagram, TheoryTypedNamedRelationDiagram
-  import Catlab.Programs.RelationalPrograms: parse_relation_diagram
   using Catlab.Programs.RelationalPrograms
+  using Catlab.Programs.RelationalPrograms: TheoryTypedRelationDiagram, TheoryTypedNamedRelationDiagram, TypedNamedRelationDiagram, parse_relation_diagram
   using Catlab.Graphics
   using Catlab.WiringDiagrams
   using Catlab.CategoricalAlgebra.CSets
@@ -101,6 +100,7 @@ module Queries
     for b in 1:nparts(q, :Box)
       # Set junction and outer_port types (these will be inferred from schema types)
       q[:outer_port_type] .= nothing
+      q[:outer_port_name] .= nothing
       q[:junction_type] .= nothing
       name = q[b, :name]
 
@@ -117,7 +117,8 @@ module Queries
     end
     infer!(q, [([:port_type],[:junction, :junction_type]),
                ([:outer_junction, :junction_type],[:outer_port_type]),
-               ([:comp_port1,:port_type],[:comp_port2,:port_type])]);
+               ([:comp_port1,:port_type],[:comp_port2,:port_type]),
+               ([:outer_port_name],[:outer_junction, :variable])]);
     q
   end
 
@@ -231,7 +232,7 @@ module Queries
   end
 
   function draw_query(q; kw...)
-    uwd = TypedRelationDiagram{NullableSym, NullableSym, NullableSym}()
+    uwd = TypedNamedRelationDiagram{NullableSym, NullableSym, NullableSym}()
     copy_parts!(uwd, q)
     to_graphviz(uwd; box_labels=:name, junction_labels=:variable, kw...)
   end
