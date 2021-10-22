@@ -108,7 +108,7 @@ module Queries
       # add comparison references for later type-inference
       if name in keys(SQLOperators)
         add_part!(q, :Comparison, comp_port1=ports[1], comp_port2=ports[2])
-        set_subparts!(q, 1:2, port_name=SQLOperators[name][2][1:2], port_type=[nothing, nothing])
+        set_subparts!(q, ports, port_name=SQLOperators[name][2][1:2], port_type=[nothing, nothing])
       else
         fields = [port_names[name][i][1] for i in 1:length(ports)]
         types = [Symbol(port_names[name][i][2]) for i in 1:length(ports)]

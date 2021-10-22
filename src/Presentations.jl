@@ -42,54 +42,45 @@ module Presentations
   end
 
   macro present_to_schema(head)
-    present_to_schema(head.args[1], eval(GlobalRef(Main, head.args[2])))
+    present_to_schema(head.args[1], head.args[2])
   end
 
-  function present_to_schema(sch_name::Symbol, wf::Presentation)
-    gens = Array{GATExpr, 1}()
-    tables = Dict{Symbol, GATExpr}()
-    sym_app(s::Symbol, suffix::String) = Symbol(string(s, suffix))
-    get_syms(g::Union{GATExpr, Array}) = begin
-      if g isa Array
-        if eltype(g) == Symbol
-          return [g]
+  function present_to_schema(sch_name::Symbol, wf::Symbol)
+    quote
+      gens = Array{GATExpr, 1}()
+      tables = Dict{Symbol, GATExpr}()
+      sym_app(s::Symbol, suffix::String) = Symbol(string(s, suffix))
+      get_syms(g::Union{GATExpr, Array}) = begin
+        if g isa Array
+          if eltype(g) == Symbol
+            return [g]
+          end
+          sym_array = Array{Array{Symbol, 1}, 1}()
+          for i in g
+            append!(sym_array, get_syms(i))
+          end
+          return sym_array
+        elseif hasprop(g, :args)
+          return get_syms(g.args)
         end
-        sym_array = Array{Array{Symbol, 1}, 1}()
-        for i in g
-          append!(sym_array, get_syms(i))
-        end
-        return sym_array
-      elseif hasprop(g, :args)
-        return get_syms(g.args)
       end
+
+      # Evaluate homs to purely data-connected tables
+      for g in generators($(esc(wf)), :Hom)
+        g_name = g.args[1]
+        table = Ob(FreeSchema, g_name)
+        tables[g_name] = table
+        push!(gens, table)
+        append!(gens, map(enumerate(get_syms(g.type_args))) do (i, sym)
+                  Attr(sym_app(g_name, "_$(i)_$(sym[1])$i"),
+                       table, generator(TheorySQL, sym[2]))
+        end)
+      end
+
+      @present p <: TheorySQL begin end
+      add_generators!(p, gens)
+      $(esc(:eval))(:(@db_schema $($(Meta.quot(sch_name)))($(p))))
     end
-
-    # Evaluate objects to tables with attributes
-    #for g in generators(wf, :Ob)
-    #  g_name = g.args[1]
-    #  tab_name = sym_app(g_name, "_T")
-    #  table = Ob(FreeSchema, tab_name)
-    #  tables[g_name] = table
-    #  push!(gens, table)
-    #  push!(gens, Attr(sym_app(tab_name, "_1_id"), table, generator(TheorySQL, :Int64)))
-    #  push!(gens, Attr(sym_app(tab_name, "_1_data"), table, generator(TheorySQL, g.args[2])))
-    #end
-
-    # Evaluate homs to purely data-connected tables
-    for g in generators(wf, :Hom)
-      g_name = g.args[1]
-      table = Ob(FreeSchema, g_name)
-      tables[g_name] = table
-      push!(gens, table)
-      append!(gens, map(enumerate(get_syms(g.type_args))) do (i, sym)
-                Attr(sym_app(g_name, "_$(i)_$(sym[1])$i"),
-                     table, generator(TheorySQL, sym[2]))
-      end)
-    end
-
-    @present p <: TheorySQL begin end
-    add_generators!(p, gens)
-    :($(esc(:(@db_schema $(sch_name)($p)))))
   end
 
   function draw_schema(p::Presentation; kw...)
