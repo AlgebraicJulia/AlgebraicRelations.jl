@@ -29,7 +29,7 @@ using Catlab
   relation_3_relationship::Attr(relation, Real)
 end;
 
-Workplace = SchemaType(WorkplaceSchema)
+@db_schema Workplace(WorkplaceSchema)
 schema = Workplace()
 
 db = SQLite.DB()

@@ -1,18 +1,11 @@
 module Queries
   using Catlab: @present
-  import Catlab.Programs.RelationalPrograms: TheoryTypedRelationDiagram
-  import Catlab.Programs.RelationalPrograms: parse_relation_diagram
   using Catlab.Programs.RelationalPrograms
+  using Catlab.Programs.RelationalPrograms: TheoryTypedRelationDiagram, TheoryTypedNamedRelationDiagram, TypedNamedRelationDiagram, parse_relation_diagram
   using Catlab.Graphics
   using Catlab.WiringDiagrams
   using Catlab.CategoricalAlgebra.CSets
   using ..DB
-  using ..Functors
-
-  # Used for the redefinition of copy_parts!
-  using Catlab.Theories: Schema, FreeSchema, dom, codom,
-    CatDesc, CatDescType, AttrDesc, AttrDescType, SchemaType,
-    ob_num, hom_num, data_num, attr_num, dom_num, codom_num
 
   export TheoryQuery, Query, @query, to_sql, draw_query, to_prepared_sql, infer!
 
@@ -24,8 +17,7 @@ module Queries
                             :(!=) => ("<>", [:first, :second]),
                            )
 
-  @present TheoryQuery <: TheoryTypedRelationDiagram begin
-    field::Attr(Port, Name)
+  @present TheoryQuery <: TheoryTypedNamedRelationDiagram begin
     Comparison::Ob
     comp_port1::Hom(Comparison, Port)
     comp_port2::Hom(Comparison, Port)
@@ -34,14 +26,12 @@ module Queries
     # subpart(q, :port_type) == subpart(q, subpart(q, :junction), :junction_type)
   end
 
-  const Query = ACSetType(TheoryQuery,
-                          index=[:box, :junction, :outer_junction, :field],
-                          unique_index=[:variable])
+  @acset_type Query(TheoryQuery,
+                    index=[:box, :junction, :outer_junction, :port_name],
+                    unique_index=[:variable])
 
   NullableSym = Union{Symbol, Nothing}
   Query() = Query{NullableSym, NullableSym, NullableSym}()
-
-
 
   function infer!(wd, rels::Array{Tuple{Array{Symbol,1}, Array{Symbol,1}},1}; max_iter=2*length(rels))
     # Perform multiple steps to fill in chains of relations
@@ -101,43 +91,35 @@ module Queries
     return all(is_defined), changed
   end
 
-  function RelToQuery(schema)
+  function Query(schema, wd)
     port_names = get_fields(schema)
-    function ob_to_sql(rel::UntypedRelationDiagram)
-      q = Query()
-      copy_parts!(q, rel)
-      name = subpart(rel, 1, :name)
+    q = Query()
+    copy_parts!(q, wd)
 
+    # Add types to each of the junctions by iterating through each box
+    for b in 1:nparts(q, :Box)
       # Set junction and outer_port types (these will be inferred from schema types)
-      set_subpart!(q, :outer_port_type, nothing)
-      set_subpart!(q, :junction_type, nothing)
+      q[:outer_port_type] .= nothing
+      q[:outer_port_name] .= nothing
+      q[:junction_type] .= nothing
+      name = q[b, :name]
 
+      ports = incident(wd, b, :box)
       # add comparison references for later type-inference
       if name in keys(SQLOperators)
-        ports = incident(rel, 1, :box)
         add_part!(q, :Comparison, comp_port1=ports[1], comp_port2=ports[2])
-        set_subparts!(q, 1:2, field=SQLOperators[name][2][1:2], port_type=[nothing, nothing])
+        set_subparts!(q, ports, port_name=SQLOperators[name][2][1:2], port_type=[nothing, nothing])
       else
-        fields = [port_names[name][i][1] for i in 1:nparts(q, :Port)]
-        types = [Symbol(port_names[name][i][2]) for i in 1:nparts(q, :Port)]
-        set_subparts!(q, 1:nparts(q, :Port), field=fields, port_type=types)
+        fields = [port_names[name][i][1] for i in 1:length(ports)]
+        types = [Symbol(port_names[name][i][2]) for i in 1:length(ports)]
+        set_subparts!(q, ports, port_name=fields, port_type=types)
       end
-      q
     end
-
-    toQuery = Functor(ob_to_sql, Query)
-
-    function toSQL(rel::UntypedRelationDiagram)
-      q = toQuery(rel)
-      infer!(q, [([:port_type],[:junction, :junction_type]),
-                 ([:outer_junction, :junction_type],[:outer_port_type]),
-                 ([:comp_port1,:port_type],[:comp_port2,:port_type])]);
-      q
-    end
-  end
-
-  function Query(schema, wd)
-    RelToQuery(schema)(wd)
+    infer!(q, [([:port_type],[:junction, :junction_type]),
+               ([:outer_junction, :junction_type],[:outer_port_type]),
+               ([:comp_port1,:port_type],[:comp_port2,:port_type]),
+               ([:outer_port_name],[:outer_junction, :variable])]);
+    q
   end
 
   macro query(schema, exprs...)
@@ -187,7 +169,7 @@ module Queries
     op_inds = findall(x -> x in keys(SQLOperators), box_names)
 
     outer_juncs = subpart(q, :outer_junction)
-    port_info = subparts(q, [:box, :junction, :field])
+    port_info = subparts(q, [:box, :junction, :port_name])
     junctions = zeros(Int, nparts(q, :Junction))
     variables = subpart(q, :variable)
     prepared_junctions = findall(x -> string(x)[1] == '_', variables)
@@ -250,7 +232,7 @@ module Queries
   end
 
   function draw_query(q; kw...)
-    uwd = TypedRelationDiagram{NullableSym, NullableSym, NullableSym}()
+    uwd = TypedNamedRelationDiagram{NullableSym, NullableSym, NullableSym}()
     copy_parts!(uwd, q)
     to_graphviz(uwd; box_labels=:name, junction_labels=:variable, kw...)
   end
