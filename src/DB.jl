@@ -2,7 +2,7 @@ module DB
   using Catlab: @present
   using Catlab.Present
   using Catlab.CategoricalAlgebra.CSets
-  using Catlab.CSetDataStructures: struct_acset
+  using Catlab.CSetDataStructures.DenseACSets: struct_acset
   export TheorySQL, generate_schema_sql, @present, get_fields, TypeToSQL, typeToSQL, @db_schema, AbstractSQL
 
   TypeToSQL = Dict("String" => "text",
