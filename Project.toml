@@ -1,7 +1,7 @@
 name = "AlgebraicRelations"
 uuid = "1c3ea84b-a956-4dfe-a2f4-485757f48f1d"
 authors = ["bosonbaas <bosonbaas@gmail.com>"]
-version = "0.3.0"
+version = "0.3.1"
 
 [deps]
 AlgebraicPetri = "4f99eebe-17bf-4e98-b6a1-2c4f205a959b"
