@@ -1,7 +1,7 @@
 module Queries
   using Catlab: @present
   using Catlab.Programs.RelationalPrograms
-  using Catlab.Programs.RelationalPrograms: TheoryTypedRelationDiagram, TheoryTypedNamedRelationDiagram, TypedNamedRelationDiagram, parse_relation_diagram
+  using Catlab.Programs.RelationalPrograms: TypedNamedRelationDiagram, parse_relation_diagram
   using Catlab.Graphics
   using Catlab.WiringDiagrams
   using Catlab.CategoricalAlgebra.CSets
@@ -17,7 +17,7 @@ module Queries
                             :(!=) => ("<>", [:first, :second]),
                            )
 
-  @present TheoryQuery <: TheoryTypedNamedRelationDiagram begin
+  @present TheoryQuery <: SchTypedNamedRelationDiagram begin
     Comparison::Ob
     comp_port1::Hom(Comparison, Port)
     comp_port2::Hom(Comparison, Port)
