@@ -154,9 +154,9 @@ module Schemas
       from_tab = sch[from_col, :table]
       to_col = sch[fk, :to]
       to_tab = sch[to_col, :table]
-      "ALTER TABLE $(sch[from_tab, :tname]) \
-       ADD COLUMN $(sch[from_col, :cname]) INTEGER \
-       REFERENCES $(sch[to_tab, :tname])($(sch[to_col, :cname]))"
+      join(("ALTER TABLE $(sch[from_tab, :tname])",
+            "ADD COLUMN $(sch[from_col, :cname]) INTEGER",
+            "REFERENCES $(sch[to_tab, :tname])($(sch[to_col, :cname]))"), " ")
     end
     "$(join(vcat(table_gen, fk_gen), ";\n"));"
   end
