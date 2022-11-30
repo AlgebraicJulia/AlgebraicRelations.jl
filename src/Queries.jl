@@ -14,7 +14,6 @@ module Queries
     end)
   end
 
-
   function to_funsql(rel, sch::SQLSchema; queries::Dict{Symbol, SQLNode} = Dict{Symbol, SQLNode}())
     to_funsql(rel, merge(to_tables(sch), queries))
   end
@@ -57,19 +56,4 @@ module Queries
     funsql |> Select(map(j -> rel[j, :outer_port_name]=>j_value[rel[j, :outer_junction]], 1:nparts(rel, :OuterPort))...)
   end
 
-#=
-  function to_prepared_sql(q::Query, uid::String)
-    junc_types = map(x -> typeToSQL(x), subpart(q, :junction_type))
-    prepared_junctions = findall(x -> string(x)[1] == '_', subpart(q, :variable))
-
-    return "PREPARE \"$uid\" ($(join(junc_types[prepared_junctions], ","))) AS\n$(to_sql(q))",
-           length(prepared_junctions)
-  end
-
-  function draw_query(q; kw...)
-    uwd = TypedNamedRelationDiagram{NullableSym, NullableSym, NullableSym}()
-    copy_parts!(uwd, q)
-    to_graphviz(uwd; box_labels=:name, junction_labels=:variable, kw...)
-  end
-  =#
 end
