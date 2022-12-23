@@ -3,7 +3,7 @@
 ![Tests](https://github.com/AlgebraicJulia/AlgebraicRelations.jl/workflows/Tests/badge.svg)
 
 AlgebraicRelations.jl is a Julia library built to provide an intuitive and
-elegant method for generating and querying a scientific database. This 
+elegant method for generating and querying a scientific database. This
 package provides tooling for defining database schemas,
 generating query visualizations, and connecting directly up to a PostgreSQL
 server. This package is built on top of
@@ -75,7 +75,7 @@ Once this presentation is defined, the database schema can be generated as follo
 
 ```julia
 # Convert to Schema
-TrainDB = present_to_schema(present);
+@present_to_schema TrainDB(present);
 print(generate_schema_sql(TrainDB()))
 ```
 ```sql
