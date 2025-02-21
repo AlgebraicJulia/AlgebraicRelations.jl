@@ -4,22 +4,34 @@ authors = ["bosonbaas <bosonbaas@gmail.com>"]
 version = "0.3.1"
 
 [deps]
-AlgebraicPetri = "4f99eebe-17bf-4e98-b6a1-2c4f205a959b"
-AutoHashEquals = "15f4f7f2-30c1-5605-9d31-71845cf9641f"
 Catlab = "134e5e36-593f-5add-ad60-77f754baafbe"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+FunSQL = "cf6cc811-59f4-4a10-b258-a8547a8f6407"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 LibPQ = "194296ae-ab2e-5f79-8cd4-7183a0a5a0d1"
+Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+SQLite = "0aa819cd-b072-5ff4-a722-6bc24af294d9"
+Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
+
+[weakdeps]
+DuckDB = "d2f5444f-75bc-4fdf-ac35-56f514c445e1"
+LibPQ = "2196b101-3ac0-4e12-b5a8-532424305d17"
+MySQL = "39abe10b-433b-5dbd-92d4-e302a9df00cd"
+
+[extensions]
+DuckDBAlgRelExt = "DuckDB"
+LibPQAlgRelExt = "LibPQ"
+MySQLACSetsExt = "MySQL"
+SQLiteAlgRelExt = "SQLite"
 
 [compat]
-AlgebraicPetri = "0.6, 0.7"
-AutoHashEquals = "0.2.0, 1, 2"
-Catlab = "0.14"
+Catlab = "0.16"
 DataFrames = "1.0"
-LibPQ = "1.4.0"
-julia = "1.0"
+Reexport = "1.2.2"
+SQLite = "1.6.1"
+julia = "1.6"
 
 [extras]
-SQLite = "0aa819cd-b072-5ff4-a722-6bc24af294d9"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]

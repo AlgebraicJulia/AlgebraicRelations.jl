@@ -1,6 +1,11 @@
 module AlgebraicRelations
-  include("DB.jl")
-  include("Queries.jl")
-  include("Interface.jl")
-  include("Presentations.jl")
+
+using Reexport
+
+include("Schemas.jl")
+include("Queries.jl")
+
+@reexport using .Schemas
+@reexport using .Queries
+
 end
