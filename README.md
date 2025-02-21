@@ -1,9 +1,14 @@
-# <img src="docs/src/assets/logo.png" width="15%">   AlgebraicRelations.jl
+# <img src="docs/src/assets/logo.png" width="15%"> AlgebraicRelations.jl
+
+[![Stable Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://AlgebraicJulia.github.io/AlgebraicRelations.jl/stable)
+[![Development Documentation](https://img.shields.io/badge/docs-dev-blue.svg)](https://AlgebraicJulia.github.io/AlgebraicRelations.jl/dev)
+[![Code Coverage](https://codecov.io/gh/AlgebraicJulia/AlgebraicRelations.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/AlgebraicJulia/AlgebraicRelations.jl)
+[![CI/CD](https://github.com/AlgebraicJulia/AlgebraicRelations.jl/actions/workflows/julia_ci.yml/badge.svg)](https://github.com/AlgebraicJulia/AlgebraicRelations.jl/actions/workflows/julia_ci.yml)
 
 ![Tests](https://github.com/AlgebraicJulia/AlgebraicRelations.jl/workflows/Tests/badge.svg)
 
 AlgebraicRelations.jl is a Julia library built to provide an intuitive and
-elegant method for generating and querying a scientific database. This 
+elegant method for generating and querying a scientific database. This
 package provides tooling for defining database schemas,
 generating query visualizations, and connecting directly up to a PostgreSQL
 server. This package is built on top of
@@ -19,7 +24,7 @@ Schema](#defining-a-schema), [Creating Queries](#creating-queries), and
 
 ### Defining a Schema
 
-Within this library, we define database schemas based on the *presentation* of a
+Within this library, we define database schemas based on the _presentation_ of a
 workflow (more generally, the presentation of a symmetric monoidal category).
 The presentation of a workflow includes the **data types** of products in the
 workflow (objects in an SMC) and the **processes** that transform these products
@@ -69,6 +74,7 @@ evaluate = add_processes!(present, [(:extract, File, Images),
                                     (:train, NeuralNet⊗Images, NeuralNet⊗Metadata),
                                     (:evaluate, NeuralNet⊗Images, Accuracy⊗Metadata)]);
 ```
+
 #### Generating the Schema
 
 Once this presentation is defined, the database schema can be generated as follows:
@@ -78,6 +84,7 @@ Once this presentation is defined, the database schema can be generated as follo
 TrainDB = present_to_schema(present);
 print(generate_schema_sql(TrainDB()))
 ```
+
 ```sql
 CREATE TABLE evaluate (NeuralNet1 text, Images2 text, Accuracy3 real, Metadata4 text);
 CREATE TABLE extract (File1 text, Images2 text);
@@ -86,6 +93,7 @@ CREATE TABLE train (NeuralNet1 text, Images2 text, NeuralNet3 text, Metadata4 te
 ```
 
 ### Creating Queries
+
 In order to create queries, we use the `@query` macro (based on the `@relation`
 macro in Catlab). For this, we must specify a list of objects to get as results
 of the query, list of all objects used in the query, and finally a list of
@@ -107,6 +115,7 @@ print(to_sql(q))
 ```
 
 This produces the following query:
+
 ```sql
 SELECT t1.Images2 AS im_train, t1.NeuralNet1 AS nn, t2.Images2 AS im_test, t2.Accuracy3 AS acc, t2.Metadata4 AS md2
 FROM train AS t1, evaluate AS t2, split AS t3
@@ -114,17 +123,22 @@ WHERE t2.NeuralNet1=t1.NeuralNet3 AND t3.Images2=t1.Images2 AND t3.Images3=t2.Im
 ```
 
 ### Connecting to PostgreSQL
+
 The connection to PostgreSQL is fairly straightforward. We first create a
 connection using the [LibPQ.jl](https://invenia.github.io/LibPQ.jl/stable/)
 library:
+
 ```Julia
 conn = Connection("dbname=test_db");
 ```
+
 We then can prepare statements and run them with arguments like:
+
 ```Julia
 statement = prepare(conn,q)
 execute(statement, [0.6])
 ```
+
 which will obtain all of the rows from the previous query which contain
 an accuracy of greater than 0.6.
 
@@ -132,11 +146,13 @@ The `execute` function will return a `DataFrame` object (from the
 [`DataFrames.jl`](http://juliadata.github.io/DataFrames.jl/stable/) library)
 
 ## Theory
+
 Some excellent resources for understanding how Bicategories of Relations relate
 to SQL queries (and inspiriation for this library) are as follows:
-* ["Knowledge Representation in Bicategories of Relations"](https://arxiv.org/abs/1706.00526)
-  * This work does an excellent job of elucidating operations on the Bicategories of Relations and how that relates to methods of knowledge representation like SQL
-* ["The operad of wiring diagrams: formalizing a graphical language for databases, recursion, and plug-and-play circuits"](https://arxiv.org/abs/1305.0297)
-  * This work presents the concepts behind converting undirected wiring diagrams to queries (as well as the limitations present in this conversion)
-* Category Theory for Scientists by Spivak
-  * While generally a very useful introduction to Category Theory, this book elaborates on the categorization of databases in Chapter 3 (in the online version)
+
+- ["Knowledge Representation in Bicategories of Relations"](https://arxiv.org/abs/1706.00526)
+  - This work does an excellent job of elucidating operations on the Bicategories of Relations and how that relates to methods of knowledge representation like SQL
+- ["The operad of wiring diagrams: formalizing a graphical language for databases, recursion, and plug-and-play circuits"](https://arxiv.org/abs/1305.0297)
+  - This work presents the concepts behind converting undirected wiring diagrams to queries (as well as the limitations present in this conversion)
+- Category Theory for Scientists by Spivak
+  - While generally a very useful introduction to Category Theory, this book elaborates on the categorization of databases in Chapter 3 (in the online version)
