@@ -3,9 +3,8 @@ module SQLiteInterop
   using Catlab.CategoricalAlgebra
   using Tables
   using ...SQLite
-  export db2schema
 
-  function db2schema(db::SQLite.DB)
+  function AlgebraicRelations.SQLSchema(db::SQLite.DB)
     sch = SQLSchema()
     tables = [t.name for t in SQLite.tables(db)]
     tab_ind = add_parts!(sch, :Table, length(tables), tname=tables)
