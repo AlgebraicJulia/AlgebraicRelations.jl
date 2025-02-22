@@ -59,7 +59,7 @@ for stmt in insert_stmts
   DBInterface.execute(db, stmt)
 end
 
-tab = to_tables(busSchema)
+tab = SQLTable(busSchema)
 
 @testset "Generate SQL Queries" begin
 

@@ -2,37 +2,47 @@ module Queries
 
 export to_funsql, to_tables
 
-using Catlab, Catlab.CategoricalAlgebra
+using Catlab
+using Catlab.CategoricalAlgebra
+using Catlab.RelationalPrograms: UntypedNamedRelationDiagram
 using JSON
-using FunSQL: SQLTable, Where, Join, Select, Get, render, From, As, Fun, SQLNode
+using FunSQL: Where, Join, Select, Get, render, From, As, Fun, SQLNode
+import FunSQL: SQLTable
 
 using ..Schemas
 
-function to_tables(sch::SQLSchema)
+function SQLTable(sch::SQLSchema)
   Dict{Symbol, Union{SQLTable, SQLNode}}(map(parts(sch, :Table)) do t
     tname = Symbol(lowercase(sch[t, :tname]))
-    tname => SQLTable(tname, columns = Symbol.(sch[incident(sch, t, :table),:cname]))
+    tname => SQLTable(tname, columns = Symbol.(sch[incident(sch, t, :table), :cname]))
   end)
 end
 
-function to_funsql(rel, sch::SQLSchema; queries::Dict{Symbol, SQLNode} = Dict{Symbol, SQLNode}())
+function to_funsql(rel, sch::SQLSchema; 
+        queries::Dict{Symbol, SQLNode} = Dict{Symbol, SQLNode}())
   to_funsql(rel, merge(to_tables(sch), queries))
 end
 
-function to_funsql(rel, schema::Dict{Symbol, Union{SQLTable, SQLNode}})
+function to_funsql(rel::UntypedNamedRelationDiagram,
+        schema::Dict{Symbol, Union{SQLTable, SQLNode}})
+    # create a vector as long as the number of boxes
   included_tables = fill(false, nparts(rel, :Box))
   box_uid = [Symbol("b$i") for i in 1:nparts(rel, :Box)]
   j_value = Vector{Any}([nothing for i in 1:nparts(rel, :Junction)])
   to_include = [1]
+  # replace the names
   rel[:name] .= Symbol.(lowercase.(string.(rel[:name])))
   funsql = schema[rel[1, :name]] isa SQLNode ?
               (schema[rel[1, :name]] |> As(box_uid[1])) :
               (From(schema[rel[1, :name]]) |> As(box_uid[1]))
+  # algorithm
   while(!isempty(to_include))
     cur_box = pop!(to_include)
     included_tables[cur_box] = true
+    # ...
     ports = incident(rel, cur_box, :box)
     join_rels = Vector{Any}()
+    
     for p in ports
       jctn = rel[p, :junction]
       get_p = Get[box_uid[cur_box]][rel[p,:port_name]]
