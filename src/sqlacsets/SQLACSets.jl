@@ -3,6 +3,7 @@ module SQLACSets
 using ACSets
 
 using MLStyle
+using FunSQL
 using DataFrames
 using DBInterface
 

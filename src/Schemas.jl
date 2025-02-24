@@ -42,20 +42,20 @@ type2sql(::Type{<:String}) = "TEXT"
 type2sql(s::Symbol) = type2sql("$s")
 type2sql(s::String) = s ∈ keys(TypeToSQL) ? TypeToSQL[s] : "TEXT"
 
-SQLSchema(args...) = SQLSchema{String}(args...)
-
 function SQLSchema(p::Presentation; types::Union{Dict, Nothing}=nothing)
     fields = get_fields(p, types)
-    sch = SQLSchema()
+    sch = SQLSchema{String}()
     tables = keys(fields)
-    id = "SERIAL PRIMARY KEY"
+    id = "SERIAL PRIMARY KEY" # PostgreSQL
     fk = "INTEGER"
     tab2ind = Dict{Symbol, Int64}()
+    # load tables into their relations
     for t in tables
       t_ind = add_part!(sch, :Table, tname="$t")
       add_part!(sch, :Column, table=t_ind, cname="id", type=id)
       tab2ind[t] = t_ind
     end
+    #
     for t in tables
       for c in fields[t]
         if c[1] == :Hom
@@ -70,6 +70,10 @@ function SQLSchema(p::Presentation; types::Union{Dict, Nothing}=nothing)
     sch
 end
 
+SQLSchema(args...) = SQLSchema{String}()
+
+
+# XXX
 # Targets of foreign keys are not included in the final ACSet
 # Does not adequately address the problem of multiple foreign keys between
 # tables
@@ -89,19 +93,20 @@ function Presentation(sch::SQLSchema)
     cname = sch[c, :cname]
     type = sch[c, :type]
     tname = sch[sch[c, :table], :tname]
-    Attr(Symbol(tname, "!", cname),
-               ob_map[tname], attr_map[type])
+    Attr(Symbol(tname, "!", cname), ob_map[tname], attr_map[type])
   end
 end
 export Presentation
 
+# TODO not clear how this is JSON
 function to_json(sch::Presentation)
-  fields = get_fields(sch)
-  Dict(map(collect(keys(fields))) do k
-           k => vcat([f[2] for f in fields[k]], [:id])
-  end)
+    fields = get_fields(sch, nothing)
+    Dict(map(collect(keys(fields))) do k
+        k => vcat([f[2] for f in fields[k]], [:id])
+    end)
 end
 
+# TODO namespacing
 # Just remove all info prior to `!` (this helps with ensuring generated ACSets have unique field names)
 function hom_name(generator)
   name = first(generator.args)
@@ -113,10 +118,7 @@ function ob_name(generator)
 end
 
 function get_fields(sch::Presentation, types::Union{Dict, Nothing})
-  fields = Dict{Symbol, Vector}()
-  for obj in sch.generators[:Ob]
-    fields[ob_name(obj)] = Vector{Any}()
-  end
+  fields = Dict([ob_name(obj) => Vector{Any}() for obj in sch.generators[:Ob]]) 
   for h in sch.generators[:Hom]
       fname = hom_name(h)
       if !isnothing(fname)
@@ -148,6 +150,7 @@ function render_schema(sch::SQLSchema)
     from_tab = sch[from_col, :table]
     to_col = sch[fk, :to]
     to_tab = sch[to_col, :table]
+    # TODO have Alter Table method that dispatches on connection
     join(("ALTER TABLE $(sch[from_tab, :tname])",
           "ADD COLUMN $(sch[from_col, :cname]) INTEGER",
           "REFERENCES $(sch[to_tab, :tname])($(sch[to_col, :cname]))"), " ")
@@ -164,4 +167,5 @@ function load_schema(dict::Dict)
     Symbol(k) => SQLTable(Symbol(k), columns = Symbol.(dict[k]))
   end)
 end
+
 end

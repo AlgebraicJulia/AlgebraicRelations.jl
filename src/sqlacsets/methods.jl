@@ -1,36 +1,31 @@
 using MLStyle.Modules.Cond
 
-function tostring end
-export tostring
-
-function select end
-function delete! end
-function create! end
-function alter! end
-function update! end
-
-export create!
+using DataFrames
+using FunSQL: reflect
 
 abstract type AbstractVirtualACSet end
 
 #### Reading large data materialized elsewhere
-@kwdef mutable struct VirtualACSet{Conn<:DBInterface.Connection}
-    conn::Conn
-    acsettype::Type{<:StructACSet}
+@kwdef mutable struct VirtualACSet{Conn}
+    conn::FunSQL.SQLConnection{Conn}
+    acsettype::Union{Type{<:ACSet}, Nothing} = nothing
     view::Union{DataFrames.DataFrame, Nothing} = nothing
 end
 export VirtualACSet
 # TODO we need to convert the `view` into an ACSet
 
-function VirtualACSet(conn::Conn, acs::SimpleACSet) where Conn
+function VirtualACSet(conn::FunSQL.SQLConnection{Conn}, acs::A) where {Conn, A<:ACSet}
     VirtualACSet{Conn}(conn=conn, acsettype=typeof(acs))
+end
+
+function VirtualACSet(conn::Conn, acs::SimpleACSet) where {Conn<:DBInterface.Connection}
+    c = FunSQL.DB(conn, catalog=reflect(conn))
+    VirtualACSet{Conn}(conn=c, acsettype=typeof(acs))
 end
 
 Base.show(io::IOBuffer, v::VirtualACSet) = println(io, "$(v.conn)\n$(v.view)")
 
 # how do we know which view we are looking at?
-
-# upstream to basic ACSets
 
 # blends homs and attrs together. not idea
 function namesrctgt(schema::BasicSchema)

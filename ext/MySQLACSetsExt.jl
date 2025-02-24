@@ -1,15 +1,14 @@
 module MySQLACSetsExt
 
 using ACSets
-import ACSets: tostring, tosql
+using AlgebraicRelations
+import AlgebraicRelations: tostring, tosql
 
 using MLStyle
 using MySQL
 
-const MYSQL_DELIMITER = "//"
-
 # need to pass in user config
-function ACSets.reload!(vas::VirtualACSet{MySQL.Connection})
+function AlgebraicRelations.reload!(vas::VirtualACSet{MySQL.Connection})
     vas.conn = DBInterface.connect(MySQL.Connection, "localhost", "mysql", 
                                    db="acsets", 
                                    unix_socket="/var/run/mysqld/mysqld.sock")
@@ -46,20 +45,20 @@ function tosql(vas::VirtualACSet{MySQL.Connection}, values::Values{T}; key::Bool
 end
 
 # String constructors
-function ACSets.tostring(vas::VirtualACSet{MySQL.Connection}, i::Insert) 
+function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, i::ACSetInsert) 
     cols = join(columns(i.values), ", ")
     values = tosql(vas, i.values; key=false)
     "INSERT IGNORE INTO $(i.table) ($cols) VALUES $values ;"
 end
 
-function ACSets.tostring(vas::VirtualACSet{MySQL.Connection}, u::Update) 
+function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, u::ACSetUpdate) 
     cols = join(columns(u.values), ", ")
     wheres = !isnothing(u.wheres) ? tostring(vas, u.wheres) : ""
     "UPDATE $(u.table) SET $(tosql(vas, u.values)) " * wheres * ";"
 end
 
 # TODO might have to refactor so we can reuse code for show method
-function ACSets.tostring(vas::VirtualACSet{MySQL.Connection}, s::Select)
+function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, s::ACSetSelect)
     from = s.from isa Vector ? join(s.from, ", ") : s.from
     qty = tostring(vas, s.qty)
     join = !isnothing(s.join) ? tostring(vas, s.join) : " "
@@ -67,17 +66,17 @@ function ACSets.tostring(vas::VirtualACSet{MySQL.Connection}, s::Select)
     "SELECT $qty FROM $from " * join * wheres * ";"
 end
 
-function ACSets.tostring(vas::VirtualACSet{MySQL.Connection}, j::Join)
+function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, j::ACSetJoin)
     "$(j.type) JOIN $(j.table) ON $(tostring(vas, j.on))"
 end
-function ACSets.tostring(vas::VirtualACSet{MySQL.Connection}, ons::Vector{SQLEquation})
+function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, ons::Vector{SQLEquation})
     join(tostring.(Ref(vas), ons), " AND ")
 end
-function ACSets.tostring(vas::VirtualACSet{MySQL.Connection}, eq::SQLEquation)
+function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, eq::SQLEquation)
     "$(eq.lhs.first).$(eq.rhs.second) = $(eq.rhs.first).$(eq.rhs.second)"
 end
 
-function ACSets.tostring(vas::VirtualACSet{MySQL.Connection}, qty::SQLSelectQuantity)
+function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, qty::SQLSelectQuantity)
     @match qty begin
         ::SelectAll => "*"
         ::SelectDistinct => "*" # TODO
@@ -86,7 +85,7 @@ function ACSets.tostring(vas::VirtualACSet{MySQL.Connection}, qty::SQLSelectQuan
     end
 end
 
-function ACSets.tostring(::VirtualACSet{MySQL.Connection}, column::Union{Pair{Symbol, Symbol}, Symbol})
+function AlgebraicRelations.tostring(::VirtualACSet{MySQL.Connection}, column::Union{Pair{Symbol, Symbol}, Symbol})
     @match column begin
         ::Pair{Symbol, Symbol} => "$(column.first).$(column.second)"
         _ => column
@@ -94,14 +93,14 @@ function ACSets.tostring(::VirtualACSet{MySQL.Connection}, column::Union{Pair{Sy
 end
 
 # TODO
-function ACSets.tostring(::VirtualACSet{MySQL.Connection}, wheres::WhereClause)
+function AlgebraicRelations.tostring(::VirtualACSet{MySQL.Connection}, wheres::WhereClause)
     @match wheres begin
         WhereClause(op, d::Pair) => "WHERE $(d.first) $op ($(join(d.second, ", ")))"
         _ => wheres
     end
 end
 
-function ACSets.tostring(vas::VirtualACSet, c::Create)
+function AlgebraicRelations.tostring(vas::VirtualACSet, c::ACSetCreate)
     create_stmts = map(objects(c.schema)) do ob
         obattrs = attrs(c.schema; from=ob)
         "CREATE TABLE IF NOT EXISTS $(ob)(" * 
@@ -119,39 +118,39 @@ function ACSets.tostring(vas::VirtualACSet, c::Create)
     join(create_stmts, " ")
 end
 
-function ACSets.tostring(vas::VirtualACSet{MySQL.Connection}, d::Delete)
+function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, d::ACSetDelete)
     "DELETE FROM $(d.table) WHERE _id IN ($(join(d.ids, ",")))"
 end
 
-function ACSets.tostring(::VirtualACSet{MySQL.Connection}, v::Values)
+function AlgebraicRelations.tostring(::VirtualACSet{MySQL.Connection}, v::Values)
     "VALUES " * join(entuple(v), ", ") * ";"
 end
 
-function ACSets.tostring(::VirtualACSet{MySQL.Connection}, a::Alter)
+function AlgebraicRelations.tostring(::VirtualACSet{MySQL.Connection}, a::ACSetAlter)
     "ALTER TABLE $(a.refdom) ADD CONSTRAINT fk_$(ref) FOREIGN KEY ($(a.ref)) REFERENCES $(a.refcodom)(_id); "
 end
 
-function ACSets.tostring(::VirtualACSet{MySQL.Connection}, fkc::ForeignKeyChecks)
+function AlgebraicRelations.tostring(::VirtualACSet{MySQL.Connection}, fkc::ForeignKeyChecks)
     "SET FOREIGN_KEY_CHECKS = $(Int(fkc.bool)) ;"
 end
 
 # convenience
-function ACSets.ForeignKeyChecks(vas::VirtualACSet{MySQL.Connection}, stmt::String)
+function AlgebraicRelations.ForeignKeyChecks(vas::VirtualACSet{MySQL.Connection}, stmt::String)
     l, r = tostring.(Ref(conn), ForeignKeyChecks.([false, true]))
     wrap(stmt, l, r)
 end
 
 # overloading syntactical constructors 
-function ACSets.Insert(vas::VirtualACSet{MySQL.Connection}, acset::ACSet)
+function AlgebraicRelations.ACSetInsert(vas::VirtualACSet{MySQL.Connection}, acset::ACSet)
     map(objects(acset_schema(acset))) do ob
-        Insert(vas.conn, acset, ob)
+        ACSetInsert(vas.conn, acset, ob)
     end
 end
 
-function ACSets.Insert(vas::VirtualACSet{MySQL.Connection}, acset::ACSet, table::Symbol)
+function AlgebraicRelations.ACSetInsert(vas::VirtualACSet{MySQL.Connection}, acset::ACSet, table::Symbol)
     cols = colnames(acset, table)
     vals = getrows(vas.conn, acset, table)
-    Insert(vas.table, vals, nothing)
+    ACSetInsert(vas.table, vals, nothing)
 end
 
 

@@ -1,15 +1,15 @@
 module SQLiteInterop
-  using AlgebraicRelations.Schemas
-  using Catlab.CategoricalAlgebra
-  using Tables
-  using ...SQLite
 
-  function AlgebraicRelations.SQLSchema(db::SQLite.DB)
-    sch = SQLSchema()
+using AlgebraicRelations.Schemas
+using Catlab.CategoricalAlgebra
+using Tables
+using ...SQLite
+
+function AlgebraicRelations.SQLSchema(db::SQLite.DB)
+    sch = SQLSchema{String}()
     tables = [t.name for t in SQLite.tables(db)]
     tab_ind = add_parts!(sch, :Table, length(tables), tname=tables)
     tab2ind = Dict([tables[t] => t for t in tab_ind])
-
     col2ind = Dict{String, Dict{String, Int64}}()
     for t in tables
       col2ind[t] = Dict{String, Int64}()
@@ -31,5 +31,6 @@ module SQLiteInterop
       end
     end
     sch
-  end
+end
+
 end

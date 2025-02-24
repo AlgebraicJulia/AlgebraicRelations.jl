@@ -1,67 +1,76 @@
 #####################
 ### ACSets Interface
-#####################
+######################
+using ACSets
+
+using DBInterface
+using FunSQL
+using FunSQL: SQLTable
+using FunSQL: Select, From, Where, Agg, Group, Fun, Get, SQLTable
+using FunSQL: FROM, SELECT, WHERE, FUN
 
 function (vas::VirtualACSet)(f::Function, args...; kwargs...)
     vas.view = f(vas, args...; kwargs...)
 end
 
 # get the number of rows
-function ACSetInterface.nparts(acset::VirtualACSet{Conn}, table::Symbol)::DataFrame where Conn
-    query = DBInterface.execute(acset.conn, "SELECT COUNT(*) FROM $table;")
-    DataFrames.DataFrame(query) 
+function ACSetInterface.nparts(vas::VirtualACSet{Conn}, table::Symbol)::DataFrame where Conn
+    query = From(table) |> Group() |> Select(Agg.count())
+    DBInterface.execute(vas.conn, query) |> DataFrames.DataFrame
 end
 
 function ACSetInterface.maxpart(acset::VirtualACSet, table::Symbol) end
 
-function ACSetInterface.subpart(vas::VirtualACSet, table::Symbol, select::Select)
-    stmt = tostring(vas, select)
-    query = DBInterface.execute(vas.conn, stmt)
-    df = DataFrames.DataFrame(query); metadata!(df, "ob", table; style=:note)
+function ACSetInterface.subpart(vas::VirtualACSet, table::Symbol)
+    query = FROM(table) |> SELECT(*) 
+    df = DBInterface.execute(vas.conn, query) |> DataFrames.DataFrame
+    metadata!(df, "ob", table; style=:note)
     df
 end
+# sql
 
-function ACSetInterface.subpart(vas::VirtualACSet, table::Symbol, what::SQLSelectQuantity=SelectAll())
-    stmt = tostring(vas, Select(table; what=what))
-    query = DBInterface.execute(vas.conn, stmt)
-    df = DataFrames.DataFrame(query); metadata!(df, "ob", table; style=:note)
-    df
+# function ACSetInterface.subpart(vas::VirtualACSet, table::Symbol, what::SQLSelectQuantity=SelectAll())
+#     stmt = tostring(vas, Select(table; what=what))
+#     query = DBInterface.execute(vas.conn, stmt)
+#     df = DataFrames.DataFrame(query); metadata!(df, "ob", table; style=:note)
+#     df
+# end
+
+function tablefromcolumn(vas::VirtualACSet, column::Symbol)
+    indices = map(values(vas.conn.catalog.tables)) do table
+        haskey(table.columns, column)
+    end
+    collect(keys(vas.conn.catalog.tables))[findfirst(indices)]
 end
 
-function ACSetInterface.subpart(vas::VirtualACSet, key::Vector{Int}, column::Symbol)
-    nst = namesrctgt(acset_schema(vas.acsettype()))
-    table = nst[column] |> first
-    select = Select(table, what=SelectColumns(table => :_id, table => column), 
-                    wheres=WhereClause(:in, :_id => key))
-    subpart(vas, table, select)
+function ACSetInterface.subpart(vas::VirtualACSet, ks::Vector{Int}, column::Symbol)
+    table = tablefromcolumn(vas, column)
+    query = FROM(table) |> WHERE(FUN("in", :_id, ks...)) |> SELECT(column)
+    df = DBInterface.execute(vas.conn, query) |> DataFrames.DataFrame
 end
 
 function ACSetInterface.subpart(vas::VirtualACSet, key::Int, column::Symbol)
     subpart(vas, [key], column)
 end
 
-function ACSetInterface.subpart(vas::VirtualACSet, (:), column::Symbol; what::SQLSelectQuantity=SelectAll())
-    nst = namesrctgt(acset_schema(vas.acsettype()))
-    table = nst[column].first
-    subpart(vas, table, SelectColumns(table => column))
-    # TODO I want a way of combining Select statements
+function ACSetInterface.subpart(vas::VirtualACSet, (:), column::Symbol)
+    table = tablefromcolumn(vas, column)
+    query = FROM(table) |> SELECT(column)
+    df = DBInterface.execute(vas.conn, query) |> DataFrames.DataFrame
 end
 # TODO we can probably use DataFrames metadata to look at two dataframes as if we were looking at an ACSet. Maybe we can have a diagram of BasicSchema, say E ⇉ V where the values on these nodes are data frames
 
 # incident
 
 # TODO names::Vector{Symbol}
-function ACSetInterface.incident(vas::VirtualACSet, ids::Vector{Int}, name::Symbol)
-    nst = namesrctgt(acset_schema(vas.acsettype()))
-    table = nst[name]
-    select = Select(table.first, what=SelectColumns(table.first => :_id),
-                    wheres=WhereClause(:in, name => ids))
-    subpart(vas, table.first, select)
+function ACSetInterface.incident(vas::VirtualACSet, ids::Vector{Int}, column::Symbol)
+    table = tablefromcolumn(vas, column)
+    query = FROM(table) |> WHERE(FUN("in", column, ids...)) |> SELECT(:_id)
+    df = DBInterface.execute(vas.conn, query) |> DataFrames.DataFrame
 end
 
-# TODO names::Vector{Symbol}
-function ACSetInterface.incident(vas::VirtualACSet, id::Int, name::Symbol)
-    incident(vas, [id], name)
+function ACSetInterface.incident(vas::VirtualACSet, id::Int, column::Symbol)
+    incident(vas, [id], column)
 end
 
 # function ACSetInterface.incident(vas::VirtualACSet, table::Symbol, names::AbstractVector{Symbol}) 
@@ -72,9 +81,9 @@ end
 # add_part!
 
 function ACSetInterface.add_part!(vas::VirtualACSet, table::Symbol, values::Vector{<:NamedTuple{T}}) where T 
-    stmt = tostring(vas, Insert(table, values))
-    query = DBInterface.execute(vas, stmt)
-    DBInterface.lastrowid(query)
+    stmt = tostring(vas, ACSetInsert(table, values)) # TODO need to entuple this
+    # query = DBInterface.execute(vas.conn, stmt)
+    # DBInterface.lastrowid(query)
 end
 
 function ACSetInterface.add_part!(vas::VirtualACSet, table, value::NamedTuple{T}) where T

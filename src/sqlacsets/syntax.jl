@@ -1,3 +1,7 @@
+using DataFrames
+using DBInterface
+using MySQL
+
 function tostring end
 export tostring
 
@@ -55,66 +59,52 @@ function SelectColumns(t::Vector{Pair{Symbol, Any}})
     SelectColumns(xs)
 end
 
-struct Join
+struct ACSetJoin
     type::Symbol
     table::Symbol
     on::Union{Vector{SQLEquation}, Nothing}
-    function Join(type::Symbol, table::Symbol, on::SQLEquation)
+    function ACSetJoin(type::Symbol, table::Symbol, on::SQLEquation)
         new(type, table, [on])
     end
 end
-export Join
+export ACSetJoin
 
 @data SQLTerms begin
-    Insert(table::Symbol, values::Values, wheres::Union{WhereClause, Nothing})
-    Update(table::Symbol, values::Values, wheres::Union{WhereClause, Nothing})
-    Select(qty::SQLSelectQuantity, 
-            from::Union{Symbol, Vector{Symbol}}, # TODO could be subquery 
-            join::Union{Join, Nothing},
-            wheres::Union{WhereClause, Nothing})
-    Alter(table::Symbol, refdom::Symbol, refcodom::Symbol)
-    Create(schema::BasicSchema{Symbol})
-    Delete(table::Symbol, ids::Vector{Int})
+    ACSetInsert(table::Symbol, values::Values, wheres::Union{WhereClause, Nothing})
+    ACSetUpdate(table::Symbol, values::Values, wheres::Union{WhereClause, Nothing})
+    ACSetSelect(qty::SQLSelectQuantity, 
+        from::Union{Symbol, Vector{Symbol}}, # TODO could be subquery 
+        join::Union{ACSetJoin, Nothing},
+        wheres::Union{WhereClause, Nothing})
+    ACSetAlter(table::Symbol, refdom::Symbol, refcodom::Symbol)
+    ACSetCreate(schema::BasicSchema{Symbol})
+    ACSetDelete(table::Symbol, ids::Vector{Int})
 end
-export SQLTerms, Values, Insert, Update, Select, Alter, Create, Delete
+export SQLTerms, Values, ACSetInsert, ACSetUpdate, ACSetSelect, ACSetAlter, ACSetCreate, ACSetDelete
 
 ## Constructors
 
-function Select(from::Union{Symbol, Vector{Symbol}}; 
+function ACSetSelect(from::Union{Symbol, Vector{Symbol}}; 
         what::SQLSelectQuantity=SelectAll(),
         on::Union{Vector{SQLEquation}, Nothing}=nothing, 
         wheres::Union{WhereClause, Nothing}=nothing)
-    Select(what, from, on, wheres)
+    ACSetSelect(what, from, on, wheres)
 end
 
-function Alter(table::Symbol, arrow::Pair{Symbol, Symbol})
-    Alter(table, arrow.first, arrow.second)
+function ACSetAlter(table::Symbol, arrow::Pair{Symbol, Symbol})
+    ACSetAlter(table, arrow.first, arrow.second)
 end
 
-function Create(acset::SimpleACSet)
-    Create(acset_schema(acset))
+function ACSetCreate(acset::SimpleACSet)
+    ACSetCreate(acset_schema(acset))
 end
 
-function Insert(table::Symbol, vs::Vector{<:NamedTuple{T}}, wheres::Union{WhereClause, Nothing}=nothing) where T
-    Insert(table, Values(table, vs), wheres)
+function ACSetInsert(table::Symbol, vs::Vector{<:NamedTuple{T}}, wheres::Union{WhereClause, Nothing}=nothing) where T
+    ACSetInsert(table, Values(table, vs), wheres)
 end
 
-function Update(table::Symbol, vs::Vector{<:NamedTuple{T}}, wheres::Union{WhereClause, Nothing}=nothing) where T
-    Update(table, Values(table, vs), wheres)
-end
-
-## SQL Term Operations
-
-function Base.:+(v1::Values, v2::Values)
-    Values(v1._1 ∪ v2._1)
-end
-
-function Base.:+(i1::Insert, i2::Insert)
-    if i1.table == i2.table
-        Insert(i1.table, i1.values + i2.values)
-    else
-        [i1, i2]
-    end
+function ACSetUpdate(table::Symbol, vs::Vector{<:NamedTuple{T}}, wheres::Union{WhereClause, Nothing}=nothing) where T
+    ACSetUpdate(table, Values(table, vs), wheres)
 end
 
 abstract type DatabaseEnvironmentConfig end
