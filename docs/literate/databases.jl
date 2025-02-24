@@ -30,7 +30,7 @@ c = Create(g)
 
 execute!(vas, c)
 
-i = join(tostring.(Ref(conn), Insert(conn, g)), " ")
+i = join(tostring.(Ref(conn), ACSetInsert(g)), " ")
 
 execute!(vas, i)
 

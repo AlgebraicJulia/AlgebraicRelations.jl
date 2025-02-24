@@ -3,6 +3,9 @@ using MLStyle.Modules.Cond
 using DataFrames
 using FunSQL: reflect
 
+function tostring end
+export tostring
+
 abstract type AbstractVirtualACSet end
 
 #### Reading large data materialized elsewhere
@@ -58,12 +61,17 @@ export reload!
 # TODO generate multiple statements, then decide to execute single or multiple
 function execute!(vas::VirtualACSet{Conn}, stmt::String) where Conn
     result = DBInterface.execute(vas.conn, stmt)
+    reload!(vas)
     DataFrames.DataFrame(result)
 end
 export execute!
 
 function execute!(vas::VirtualACSet{Conn}, query::SQLTerms) where Conn
-    execute!(vas, tostring(vas, query))
+    result = @match query begin
+        ::ACSetInsert => DBInterface.execute(vas.conn.raw, tostring(vas, query))
+        _ => DBInterface.execute(vas.conn, tostring(vas, query))
+    end
+    DataFrames.DataFrame(result)
 end
 
 function ACSet!(vas::VirtualACSet{Conn}, query::SQLTerms) where Conn
@@ -102,12 +110,6 @@ function entuple(v::Values; f::Function=identity, values::Bool=true)
     ["($(join(f.(vals), ",")))" for vals in values.(v.vals)]
 end
 export entuple
-
-# FIXME
-function entuple(nt::NamedTuple)
-    @info values(nt)
-    ["($(join(vals, ",")))" for vals in values(nt)]
-end
 
 # get attrs
 function getattrs(g::SimpleACSet, table::Symbol)

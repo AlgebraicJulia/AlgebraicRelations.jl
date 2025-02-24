@@ -4,14 +4,16 @@ using ACSets
 using AlgebraicRelations
 import AlgebraicRelations: tostring, tosql
 
+using FunSQL
+using FunSQL: reflect
 using MLStyle
 using MySQL
 
 # need to pass in user config
 function AlgebraicRelations.reload!(vas::VirtualACSet{MySQL.Connection})
-    vas.conn = DBInterface.connect(MySQL.Connection, "localhost", "mysql", 
-                                   db="acsets", 
+    conn = DBInterface.connect(MySQL.Connection, "localhost", "mysql", db="acsets", 
                                    unix_socket="/var/run/mysqld/mysqld.sock")
+    vas.conn = FunSQL.DB(conn, catalog=reflect(conn))
 end
 
 function tosql end
@@ -24,6 +26,7 @@ tosql(::VirtualACSet{MySQL.Connection}, ::Type{<:Integer}) = "INTEGER"
 tosql(::VirtualACSet{MySQL.Connection}, T::DataType) = error("$T is not supported in this MySQL implementation")
 # value conversion
 tosql(::VirtualACSet{MySQL.Connection}, ::Nothing) = "NULL"
+tosql(::VirtualACSet{MySQL.Connection}, x::T) where T<:Number = x
 tosql(::VirtualACSet{MySQL.Connection}, s::Symbol) = string(s)
 tosql(::VirtualACSet{MySQL.Connection}, s::String) = "\'$s\'"
 tosql(::VirtualACSet{MySQL.Connection}, x) = x
@@ -32,7 +35,7 @@ tosql(::VirtualACSet{MySQL.Connection}, x) = x
 # I would be at peace if formatting and value representation were separated
 function tosql(vas::VirtualACSet{MySQL.Connection}, v::NamedTuple{T}; key::Bool=true) where T
     join(collect(Iterators.map(pairs(v)) do (k, v)
-        key ? "$(tosql(vas, k)) = $(tosql(vas, v))" : "$(tosql(vas, v))"
+                     key ? "$(tosql(vas, k)) = $(tosql(vas, v))" : "$(tosql(vas, v))"
     end), ", ")
 end
 
@@ -45,9 +48,10 @@ function tosql(vas::VirtualACSet{MySQL.Connection}, values::Values{T}; key::Bool
 end
 
 # String constructors
-function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, i::ACSetInsert) 
+function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, i::ACSetInsert)
     cols = join(columns(i.values), ", ")
-    values = tosql(vas, i.values; key=false)
+    values = join(["($x)" for x ∈ tosql.(Ref(vas), i.values.vals; key=false)], ", ")
+    # values = tosql(vas, i.values; key=false)
     "INSERT IGNORE INTO $(i.table) ($cols) VALUES $values ;"
 end
 

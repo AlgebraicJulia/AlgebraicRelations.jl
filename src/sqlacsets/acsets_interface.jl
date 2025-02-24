@@ -81,9 +81,7 @@ end
 # add_part!
 
 function ACSetInterface.add_part!(vas::VirtualACSet, table::Symbol, values::Vector{<:NamedTuple{T}}) where T 
-    stmt = tostring(vas, ACSetInsert(table, values)) # TODO need to entuple this
-    # query = DBInterface.execute(vas.conn, stmt)
-    # DBInterface.lastrowid(query)
+    execute!(vas, ACSetInsert(table, values))
 end
 
 function ACSetInterface.add_part!(vas::VirtualACSet, table, value::NamedTuple{T}) where T
@@ -94,8 +92,7 @@ end
 
 function ACSetInterface.set_subpart!(vas::VirtualACSet, 
         table::Symbol, values::Vector{<:NamedTuple{T}}; wheres::Union{WhereClause, Nothing}=nothing) where T 
-    stmt = tostring(vas, Update(table, values, wheres))
-    query = DBInterface.execute(vas.conn, stmt)
+    query = execute(vas!, Update(table, values, wheres))
     df = DataFrames.DataFrame(query); metadata!(df, "ob", table, style=:note)
     df
 end
@@ -110,11 +107,8 @@ end
 
 function ACSetInterface.rem_parts!(vas::VirtualACSet, table::Symbol, ids::Vector{Int}) 
     # if a table is constrained by another we might need to turn off foreign_key_checks
-    stmt = tostring(vas, Delete(table, ids))
-    query = DBInterface.execute(vas.conn, stmt)
-    result = tostring(vas, Select(table))
-    query = DBInterface.execute(vas.conn, result)
-    DataFrames.DataFrame(query)
+    execute!(vas, Delete(table, ids))
+    execute!(vas, Select(table))
 end
 
 # rem_parts!(vas, :V, 6:11) foreign key issue
