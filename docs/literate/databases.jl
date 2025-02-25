@@ -3,6 +3,7 @@ using Catlab
 using Catlab.Graphs
 using AlgebraicRelations
 #
+using FunSQL
 using DBInterface
 using MLStyle
 using DataFrames
@@ -33,7 +34,6 @@ execute!(vas, c)
 i = join(tostring.(Ref(conn), ACSetInsert(g)), " ")
 
 execute!(vas, i)
-
 
 incident(vas, nparts(vas, :V).count[1], :src)
 
@@ -78,5 +78,4 @@ v = subpart(vas, :V)
 e = subpart(vas, :E)
 
 add_part!(h, :V, label = v)
-
 add_part!(h, :E, weight = e)

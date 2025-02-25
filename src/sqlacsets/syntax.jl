@@ -75,7 +75,7 @@ export ACSetJoin
     ACSetSelect(qty::SQLSelectQuantity, 
         from::Union{Symbol, Vector{Symbol}}, # TODO could be subquery 
         join::Union{ACSetJoin, Nothing},
-        wheres::Union{WhereClause, Nothing})
+        wheres::Union{ACSetSelect, WhereClause, Nothing})
     ACSetAlter(table::Symbol, refdom::Symbol, refcodom::Symbol)
     ACSetCreate(schema::BasicSchema{Symbol})
     ACSetDelete(table::Symbol, ids::Vector{Int})
@@ -106,6 +106,17 @@ end
 function ACSetUpdate(table::Symbol, vs::Vector{<:NamedTuple{T}}, wheres::Union{WhereClause, Nothing}=nothing) where T
     ACSetUpdate(table, Values(table, vs), wheres)
 end
+
+
+function FunSQL.render(acset::ACSet, q::ACSetSelect)
+    from = s.from
+    @match s.wheres begin
+        WhereClause(:OR, wheres) => wheres
+        _ => nothing
+    end
+    # parts(acset, from)[acset[:src] .== [2] .&& acset[:tgt]
+end
+
 
 abstract type DatabaseEnvironmentConfig end
 

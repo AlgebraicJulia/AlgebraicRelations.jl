@@ -48,21 +48,20 @@ function tosql(vas::VirtualACSet{MySQL.Connection}, values::Values{T}; key::Bool
 end
 
 # String constructors
-function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, i::ACSetInsert)
+function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, i::ACSetInsert)
     cols = join(columns(i.values), ", ")
     values = join(["($x)" for x ∈ tosql.(Ref(vas), i.values.vals; key=false)], ", ")
-    # values = tosql(vas, i.values; key=false)
     "INSERT IGNORE INTO $(i.table) ($cols) VALUES $values ;"
 end
 
-function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, u::ACSetUpdate) 
+function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, u::ACSetUpdate) 
     cols = join(columns(u.values), ", ")
     wheres = !isnothing(u.wheres) ? tostring(vas, u.wheres) : ""
     "UPDATE $(u.table) SET $(tosql(vas, u.values)) " * wheres * ";"
 end
 
 # TODO might have to refactor so we can reuse code for show method
-function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, s::ACSetSelect)
+function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, s::ACSetSelect)
     from = s.from isa Vector ? join(s.from, ", ") : s.from
     qty = tostring(vas, s.qty)
     join = !isnothing(s.join) ? tostring(vas, s.join) : " "
@@ -70,26 +69,24 @@ function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, s::ACS
     "SELECT $qty FROM $from " * join * wheres * ";"
 end
 
-function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, j::ACSetJoin)
+function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, j::ACSetJoin)
     "$(j.type) JOIN $(j.table) ON $(tostring(vas, j.on))"
 end
-function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, ons::Vector{SQLEquation})
+function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, ons::Vector{SQLEquation})
     join(tostring.(Ref(vas), ons), " AND ")
 end
-function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, eq::SQLEquation)
+function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, eq::SQLEquation)
     "$(eq.lhs.first).$(eq.rhs.second) = $(eq.rhs.first).$(eq.rhs.second)"
 end
 
-function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, qty::SQLSelectQuantity)
+function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, qty::SQLSelectQuantity)
     @match qty begin
-        ::SelectAll => "*"
-        ::SelectDistinct => "*" # TODO
-        ::SelectDistinctRow => "*" # TODO
+        ::SelectAll || ::SelectDistinct || ::SelectDistinctRow => "*"
         SelectColumns(cols) => join(tostring.(Ref(vas), cols), ", ")
     end
 end
 
-function AlgebraicRelations.tostring(::VirtualACSet{MySQL.Connection}, column::Union{Pair{Symbol, Symbol}, Symbol})
+function FunSQL.render(::VirtualACSet{MySQL.Connection}, column::Union{Pair{Symbol, Symbol}, Symbol})
     @match column begin
         ::Pair{Symbol, Symbol} => "$(column.first).$(column.second)"
         _ => column
@@ -97,14 +94,14 @@ function AlgebraicRelations.tostring(::VirtualACSet{MySQL.Connection}, column::U
 end
 
 # TODO
-function AlgebraicRelations.tostring(::VirtualACSet{MySQL.Connection}, wheres::WhereClause)
+function FunSQL.render(::VirtualACSet{MySQL.Connection}, wheres::WhereClause)
     @match wheres begin
         WhereClause(op, d::Pair) => "WHERE $(d.first) $op ($(join(d.second, ", ")))"
         _ => wheres
     end
 end
 
-function AlgebraicRelations.tostring(vas::VirtualACSet, c::ACSetCreate)
+function FunSQL.render(vas::VirtualACSet, c::ACSetCreate)
     create_stmts = map(objects(c.schema)) do ob
         obattrs = attrs(c.schema; from=ob)
         "CREATE TABLE IF NOT EXISTS $(ob)(" * 
@@ -122,19 +119,19 @@ function AlgebraicRelations.tostring(vas::VirtualACSet, c::ACSetCreate)
     join(create_stmts, " ")
 end
 
-function AlgebraicRelations.tostring(vas::VirtualACSet{MySQL.Connection}, d::ACSetDelete)
+function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, d::ACSetDelete)
     "DELETE FROM $(d.table) WHERE _id IN ($(join(d.ids, ",")))"
 end
 
-function AlgebraicRelations.tostring(::VirtualACSet{MySQL.Connection}, v::Values)
+function FunSQL.render(::VirtualACSet{MySQL.Connection}, v::Values)
     "VALUES " * join(entuple(v), ", ") * ";"
 end
 
-function AlgebraicRelations.tostring(::VirtualACSet{MySQL.Connection}, a::ACSetAlter)
+function FunSQL.render(::VirtualACSet{MySQL.Connection}, a::ACSetAlter)
     "ALTER TABLE $(a.refdom) ADD CONSTRAINT fk_$(ref) FOREIGN KEY ($(a.ref)) REFERENCES $(a.refcodom)(_id); "
 end
 
-function AlgebraicRelations.tostring(::VirtualACSet{MySQL.Connection}, fkc::ForeignKeyChecks)
+function FunSQL.render(::VirtualACSet{MySQL.Connection}, fkc::ForeignKeyChecks)
     "SET FOREIGN_KEY_CHECKS = $(Int(fkc.bool)) ;"
 end
 
