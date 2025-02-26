@@ -2,10 +2,13 @@ import FunSQL: From, Select, Where
 
 mutable struct SQLACSetNode
     from::Symbol
-    cond::Union{Vector{Tuple{Symbol, Symbol, Any}}, Nothing}
+    cond::Union{Vector{Tuple{Symbol, Symbol, Any}}, Nothing} # TODO don't like Tuple
     select::Union{Symbol, Vector{Symbol}, Nothing}
+    SQLACSetNode(from::Symbol; cond=nothing, select=nothing) = new(from, cond, select)
 end
+export SQLACSetNode
 
+# TODO remove ◊
 struct ◊Ob
     x::Symbol
 end
@@ -16,6 +19,7 @@ export ◊Ob
 # TODO handle nothing case
 From(table::◊Ob) = SQLACSetNode(table.x, [], Symbol[])
 
+# TODO looks like we don't do this anymore. From is singleton for the time being.
 function From(sql::SQLACSetNode; table::◊Ob)
     sql.from = [sql.from; table.x]
     sql
@@ -68,15 +72,24 @@ Where(:src, :∈, From(◊Ob(:Op1)) |> Where(:op1, :∈, blacklist) |> Select(�
 ```
 """
 function (q::SQLACSetNode)(acset::ACSet)
-    # decided OR for now
+    # TODO decided OR for now
     idx = @match process_wheres(q, acset) begin
         ::Nothing => nothing
-        indices => length(indices) > 1 ? [l || r for (l,r) ∈ zip(indices...)] : only(indices)
+        indices::Vector{Vector{Bool}} => if length(indices) > 1
+            [l || r for (l,r) ∈ zip(indices...)]
+            else
+                only(indices)
+            end
+        x => only(x) # TODO
     end
     result = isnothing(idx) ? parts(acset, q.from) : parts(acset, q.from)[idx]
+    isempty(result) && return []
     @match q.select begin
         ::Nothing || [:_id] => return result
-        selects => [result, subpart.(Ref(acset), filter(x -> x != :_id, selects))...]
+        ::Symbol => subpart(acset, q.select)[result]
+        selects => map(selects) do select
+            subpart(acset, select)[result]
+        end
     end
 end
 
@@ -84,7 +97,9 @@ function process_wheres(q::SQLACSetNode, acset::ACSet)
     isempty(q.cond) && return nothing
     whereindices = map(q.cond) do (left, _, right)
         @match right begin
-            ::SQLACSetNode => acset[left] .∈ right(acset)
+            ::SQLACSetNode => map(acset[left]) do x
+                x ∈ right(acset)
+            end
             _ => map(x -> right isa Vector ? x ∈ right : x == right, acset[left])
         end
     end

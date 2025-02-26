@@ -107,17 +107,6 @@ function ACSetUpdate(table::Symbol, vs::Vector{<:NamedTuple{T}}, wheres::Union{W
     ACSetUpdate(table, Values(table, vs), wheres)
 end
 
-
-function FunSQL.render(acset::ACSet, q::ACSetSelect)
-    from = s.from
-    @match s.wheres begin
-        WhereClause(:OR, wheres) => wheres
-        _ => nothing
-    end
-    # parts(acset, from)[acset[:src] .== [2] .&& acset[:tgt]
-end
-
-
 abstract type DatabaseEnvironmentConfig end
 
 struct ForeignKeyChecks <: DatabaseEnvironmentConfig 

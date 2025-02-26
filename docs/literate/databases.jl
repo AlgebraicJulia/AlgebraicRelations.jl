@@ -2,36 +2,41 @@ using ACSets
 using Catlab
 using Catlab.Graphs
 using AlgebraicRelations
-#
+
 using FunSQL
 using DBInterface
 using MLStyle
 using DataFrames
-#
+
 using MySQL # loads extension
-#
-conn = DBInterface.connect(MySQL.Connection, "localhost", "mysql", db="acsets", unix_socket="/var/run/mysqld/mysqld.sock")
-#
+
+# Let's establish a connection to MariaDB.
+conn = DBInterface.connect(MySQL.Connection, "localhost", "mysql", db="acsets", 
+                    unix_socket="/var/run/mysqld/mysqld.sock")
+
+
+# Let's invoke an ACSet. We can think of an ACSet as a database schema with tables (objects), foreign key constraints (homs), and columns (Attrs) with types (AttrTypes).
 @present SchWeightedLabeledGraph <: SchLabeledGraph begin
     Weight::AttrType
     weight::Attr(E,Weight)
-end;
+end
 @acset_type WeightedLabeledGraph(SchWeightedLabeledGraph, index=[:src, :tgt]) <: AbstractLabeledGraph
 g = erdos_renyi(WeightedLabeledGraph{Symbol,Float64}, 5, 0.25);
 g[:, :label] = Symbol.(floor.(rand(nv(g)) * nv(g)));
 g[:, :weight] = floor.(rand(ne(g)) .* 100);
 
+# We'd like the ACSet to mirror. Let's virtualize an ACSet. This is a new object that sustains a relationship between our database and our ACSet. 
 vas = VirtualACSet(conn, g)
 
+# Right now, it does not verify that the database agrees with the ACSet. We would need to `diff` ACSets.
 subpart(vas, :V)
 
+# TODO replace with Render execute
+# c = Create(g)
+# execute!(vas, c)
 
-c = Create(g)
-
-
-execute!(vas, c)
-
-i = join(tostring.(Ref(conn), ACSetInsert(g)), " ")
+# This lets us build a lot of insert statements. We join them together.
+i = join(FunSQL.render.(Ref(vas), ACSetInsert(vas, g)), " ")
 
 execute!(vas, i)
 
@@ -40,6 +45,7 @@ incident(vas, nparts(vas, :V).count[1], :src)
 # TODO move "LastRowId" to a type so we can dispatch on it
 add_part!(vas, :V, (_id = nparts(vas, :V).count[1] + 1, label = "a")) 
 
+# 
 rem_part!(vas, :V, 10) # this will fail because of db constraints
 
 rem_part!(vas, :E, 10)

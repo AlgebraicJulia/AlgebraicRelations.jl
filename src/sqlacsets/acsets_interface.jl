@@ -107,8 +107,8 @@ end
 
 function ACSetInterface.rem_parts!(vas::VirtualACSet, table::Symbol, ids::Vector{Int}) 
     # if a table is constrained by another we might need to turn off foreign_key_checks
-    execute!(vas, Delete(table, ids))
-    execute!(vas, Select(table))
+    execute!(vas, ACSetDelete(table, ids))
+    execute!(vas, ACSetSelect(table))
 end
 
 # rem_parts!(vas, :V, 6:11) foreign key issue

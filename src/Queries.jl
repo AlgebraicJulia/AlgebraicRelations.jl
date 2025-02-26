@@ -12,6 +12,7 @@ import FunSQL: SQLTable
 
 using ..Schemas
 
+# TODO Change this to Catalog
 function SQLTable(sch::SQLSchema)
     Dict{Symbol, Union{SQLTable, SQLNode}}(map(parts(sch, :Table)) do t
         tname = Symbol(lowercase(sch[t, :tname]))
@@ -64,7 +65,7 @@ function to_funsql(rel::UntypedNamedRelationDiagram, schema::Dict{Symbol, Union{
     funsql |> Select(map(j -> rel[j, :outer_port_name]=>j_value[rel[j, :outer_junction]], 1:nparts(rel, :OuterPort))...)
 end
 
-# convert FunSQL to Rel
+# TODO convert FunSQL to Rel
 function relation(catalog::FunSQL.SQLCatalog, n::FunSQL.SQLNode) end
 
 end

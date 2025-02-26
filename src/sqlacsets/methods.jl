@@ -30,7 +30,7 @@ Base.show(io::IOBuffer, v::VirtualACSet) = println(io, "$(v.conn)\n$(v.view)")
 
 # how do we know which view we are looking at?
 
-# blends homs and attrs together. not idea
+# blends homs and attrs together. not ideal
 function namesrctgt(schema::BasicSchema)
     Dict([name => src => tgt for (name, src, tgt) in schema.homs ∪ schema.attrs])
 end
@@ -81,25 +81,25 @@ function ACSet!(vas::VirtualACSet{Conn}, query::SQLTerms) where Conn
     ACSet(vas)
 end
 
-function create!(conn::DBInterface.Connection, x::SimpleACSet)
-    stmt = tostring(conn, Create(x))
+function create!(vas::VirtualACSet{Conn}, x::SimpleACSet) where Conn
+    stmt = render(vas, Create(x))
     DBInterface.executemultiple(conn, stmt)
 end
 export create!
 
-function create!(v::VirtualACSet{Conn}) where Conn
-    query = tostring(v.conn, v.acsettype)
-    DBInterface.execute(v.conn, query)
+function create!(vas::VirtualACSet{Conn}) where Conn
+    query = render(vas, vas.acsettype)
+    DBInterface.execute(v.conn.raw, query)
 end
 
-function insert!(v::VirtualACSet{Conn}, acset::SimpleACSet) where Conn
-    insert_stmts = tostring.(Ref(v.conn), Insert(v.conn, acset))
-    query = DBInterface.executemultiple(conn, insert_stmts)
+function insert!(vas::VirtualACSet{Conn}, acset::SimpleACSet) where Conn
+    insert_stmts = render.(Ref(vas), Insert(v.conn, acset))
+    query = DBInterface.executemultiple(vas.conn.raw, insert_stmts)
     DataFrames.DataFrame(query)
 end
 
 function update!(v::VirtualACSet, acset::SimpleACSet)
-    update_stmts = to_string(v.conn, Update(v.conn, acset))
+    update_stmts = render(v.conn, Update(v.conn, acset))
     query = DBInterface.executemultiple(conn, update_stmts)
     DataFrames.DataFrame(query)
 end
@@ -125,10 +125,10 @@ gethoms(x::SimpleACSet, table::Symbol) = first.(homs(acset_schema(x); from=table
 export gethoms
 
 # Values should have a method which turns single values into "(1)"
-function getrows(conn::Conn, x::SimpleACSet, table::Symbol) where Conn <: DBInterface.Connection
+function getrows(vas::VirtualACSet{Conn}, x::SimpleACSet, table::Symbol) where Conn
     cols = gethoms(x, table) ∪ getattrs(x, table)
     x = map(parts(x, table)) do id
-        (;zip([:_id, cols...], [id, tosql.(Ref(conn), subpart.(Ref(x), Ref(id), cols))...])...)
+        (;zip([:_id, cols...], [id, tosql.(Ref(vas), subpart.(Ref(x), Ref(id), cols))...])...)
     end
     Values(table, x)
 end

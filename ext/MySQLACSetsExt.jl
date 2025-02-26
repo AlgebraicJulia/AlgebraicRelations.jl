@@ -48,6 +48,8 @@ function tosql(vas::VirtualACSet{MySQL.Connection}, values::Values{T}; key::Bool
 end
 
 # String constructors
+export render
+
 function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, i::ACSetInsert)
     cols = join(columns(i.values), ", ")
     values = join(["($x)" for x ∈ tosql.(Ref(vas), i.values.vals; key=false)], ", ")
@@ -144,14 +146,14 @@ end
 # overloading syntactical constructors 
 function AlgebraicRelations.ACSetInsert(vas::VirtualACSet{MySQL.Connection}, acset::ACSet)
     map(objects(acset_schema(acset))) do ob
-        ACSetInsert(vas.conn, acset, ob)
+        ACSetInsert(vas, acset, ob)
     end
 end
 
 function AlgebraicRelations.ACSetInsert(vas::VirtualACSet{MySQL.Connection}, acset::ACSet, table::Symbol)
     cols = colnames(acset, table)
-    vals = getrows(vas.conn, acset, table)
-    ACSetInsert(vas.table, vals, nothing)
+    vals = getrows(vas, acset, table)
+    ACSetInsert(table, vals, nothing)
 end
 
 
