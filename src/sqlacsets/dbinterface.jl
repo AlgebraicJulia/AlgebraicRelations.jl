@@ -1,67 +1,156 @@
-using DBInterface
-using ACSets
+import FunSQL: From, Select, Where
 
-mutable struct Connection
-    catalog::FunSQL.SQLCatalog
-    acset::ACSet
-end
-export Connection
-
-function Connection(; schema::Union{
-
-ACSets.tables(c::Connection) = tables(c.acset)
-
-struct DBConnection <: DBInterface.Connection
-    conn::Connection
+mutable struct ACSetSQLNode
+    from::Symbol
+    cond::Union{Vector{Tuple{Symbol, Symbol, Any}}, Nothing}
+    select::Union{Symbol, Vector{Symbol}, Nothing}
 end
 
-ACSets.tables(db::DBConnection) = tables(db.conn)
+struct ◊Ob
+    x::Symbol
+end
+export ◊Ob
 
-DBInterface.connect(DB{RawConnType},
-                    args...;
-                    schema = nothing,
-                    dialect = nothing,
-                    cache = 256,
-                    kws...)
+◊Ob(xs...) = ◊Ob.([xs...])
 
-# DBInterface.connect(::Type{LibPQ.Connection}, args...; kws...) =
-#     LibPQ.Connection(args...; kws...)
+# TODO handle nothing case
+From(table::◊Ob) = ACSetSQLNode(table.x, nothing, Symbol[])
 
-# DBInterface.prepare(conn::LibPQ.Connection, args...; kws...) =
-#     LibPQ.prepare(conn, args...; kws...)
+function From(sql::ACSetSQLNode; table::◊Ob)
+    sql.from = [sql.from; table.x]
+    sql
+end
+export From
 
-# DBInterface.execute(conn::Union{LibPQ.Connection, LibPQ.Statement}, args...; kws...) =
-#     LibPQ.execute(conn, args...; kws...)
+function Where(sql::ACSetSQLNode; lhs::Symbol, op::Symbol, rhs::Any)
+    sql.cond = if !isnothing(sql.cond)
+        [sql.cond; (lhs, op, rhs)]
+    else
+        [(lhs, op, rhs)]
+    end
+    sql
+end
+export Where
 
-function DBInterface.connect(::Type{Connection}, args...; kws...) =
-    Connection(args...; kws...)
-
-function DBInterface.connect(acset::ACSet)
-    presentation = Presentation(acset)
-    schema = SQLSchema(presentation)
-    tables = SQLTable(schema)
-    catalog = FunSQL.SQLCatalog(values(tables)...)
-    return DBConnection(Connection(catalog, acset))
+function Where(lhs::Symbol, op::Symbol, rhs::Any)
+    sql -> Where(sql; lhs=lhs, op=op, rhs=rhs)
 end
 
-function DBInterface.prepare(conn::DBConnection, args...; kwargs...)
-    return prepare(conn.conn, args...; kwargs...)
+function Select(sql::ACSetSQLNode; columns::Union{Symbol, Vector{Symbol}})
+    push!(sql.select, columns...)
+    sql
+end
+export Select
+
+function Select(cols::Union{◊Ob, Vector{◊Ob}})
+    if cols isa Vector
+        sql -> Select(sql; columns=getfield.(cols, :x))
+    else
+        sql -> Select(sql; columns=[cols.x])
+    end
 end
 
-function DBInterface.execute(conn::DBConnection, args...; kwargs...)
-    return execute(conn.conn, args...; kwargs...)
+function (q::ACSetSQLNode)(acset::ACSet)
+    indices = map(q.cond) do (left, _, right)
+        @match right begin
+            ::ACSetSQLNode => acset[left] .∈ right(acset)
+            _ => map(x -> right isa Vector ? x ∈ right : x == right, acset[left])
+        end
+    end
+    # decided OR for now
+    idx = length(indices) > 1 ? [l || r for (l,r) ∈ zip(indices...)] : only(indices)
+    result = parts(acset, q.from)[idx]
 end
 
-function DBInterface.execute(conn::DBConnection, str::AbstractString; kwargs...)
-    return execute(conn.conn, str; kwargs...)
-end
 
-function DBInterface.execute(conn::DBConnection, str::AbstractString, params; kwargs...)
-    return execute(conn.conn, str, params; kwargs...)
-end
+# using MLStyle
 
-function DBInterface.execute(stmt::Statement, args...; kwargs...)
-    return execute(stmt, args...; kwargs...)
-end
+# abstract type SQLACSetNode end
 
-DBInterface.close!(conn::DBConnection) = close(conn.conn)
+# @as_record struct ◊From <: SQLACSetNode
+#     table::Symbol
+#     sql::Union{SQLACSetNode, Nothing}
+#     ◊From(table::Symbol) = new(table, nothing)
+#     ◊From(table, sql) = new(table, sql)
+# end
+# export ◊From
+
+# struct _WhereClause
+#     op::Symbol
+#     lhs::Symbol
+#     rhs::Union{Symbol, <:SQLACSetNode}
+# end
+
+# @as_record struct ◊Where <: SQLACSetNode
+#     op::Union{Symbol, Nothing}
+#     ws::Union{_WhereClause, Vector{_WhereClause}}
+#     sql::Union{<:SQLACSetNode, Nothing}
+#     function ◊Where(ws::Union{_WhereClause, Vector{_WhereClause}}; 
+#             op=nothing, sql=nothing)
+#         new(op, ws, sql)
+#     end
+#     function ◊Where(op::Symbol, lhs, rhs)
+#         new(nothing, _WhereClause(op, lhs, rhs), nothing)
+#     end
+# end
+# export ◊Where
+
+# @as_record struct ◊Select <: SQLACSetNode 
+#     columns::Union{Symbol, Vector{Symbol}, Nothing}
+#     ◊Select(x) = new(x)
+#     ◊Select() = new(nothing)
+# end
+# export ◊Select
+
+# (x::◊From)(q::SQLACSetNode) = q
+# (x::◊From)(::Nothing) = x
+
+# function (w::◊Where)(q::Union{SQLACSetNode, Nothing})
+#     @match q begin
+#         ::◊From => ◊From(q.table, w(q.sql))
+#         # terminate at _Where
+#         ::◊Where => ◊Where([w.ws; q.ws]; op=w.op, sql=q.sql)
+#         ::◊Select => q(w)
+#         ::Nothing => w
+#     end
+# end
+
+# # select goes to the back
+# function (s::◊Select)(q::Union{SQLACSetNode, Nothing}) 
+#     @match q begin
+#         ::◊From => ◊From(q.table, s(q.sql))
+#         ::◊Where => ◊Where(q.ws; op=q.op, sql=s(q.sql))
+#         ::◊Select => ◊Select([q.columns; s.columns]) # combine
+#         _ => s
+#     end
+# end
+
+# ◊From(:D) |> ◊Where(:in, :src, :tgt) |> ◊Select(:a) |> ◊Select(:b)
+
+# ◊From(:D) |> ◊Where(:in, :src, :tgt)
+
+# # FROM d WHERE
+# #   d.src ∈ filter(!isnothing, infer_states(d)) ||
+# #   d.src ∈ d[:res] ||
+# #   d.src ∈ d[:sum] ||
+# #   d.src ∈ d[(from d where d.op1 ∈ blacklist select d.id), :tgt]
+# # select distinct d.id
+
+# q = ◊From(:d) |>
+#     ◊Where(:src, :in, :val) |>
+#     ◊Where(:src, :in, :res) |>
+#     ◊Where(:src, :in, :sum) |>
+#     ◊Where(:src, :in, ◊From(:d) |>
+#            ◊Where(:tgt, :in, :placeholder) |>
+#            ◊Select(:_id)) |>
+#     ◊Select(:_id);
+
+# function (q::SQLACSetNode)(acset::ACSet)
+#     @match q begin
+#         ◊From(table, 
+#         ◊Where(op, ws, 
+#         ◊Select(cols))) => ws
+#         _ => q
+#     end
+#     parts(acset, table)[
+# end

@@ -10,5 +10,6 @@ using DBInterface
 include("syntax.jl")
 include("methods.jl")
 include("acsets_interface.jl")
+include("dbinterface.jl")
 
 end

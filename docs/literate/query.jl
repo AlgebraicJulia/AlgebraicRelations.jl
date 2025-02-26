@@ -1,24 +1,23 @@
+using Catlab
+using ACSets
+
 @present SchJunct(FreeSchema) begin
     Name::AttrType
-    #
     Student::Ob
     name::Attr(Student, Name)
-    #
     Class::Ob
     subject::Attr(Class, Name)
-    #
     Junct::Ob
     student::Hom(Junct,Student)
     class::Hom(Junct,Class)
 end
-
 @acset_type JunctionData(SchJunct, index=[:name])
 jd = JunctionData{Symbol}()
-
+#
 df = Dict(:Fiona => [:Math, :Philosophy, :Music],
           :Gregorio => [:Cooking, :Math, :CompSci],
           :Heather => [:Gym, :Art, :Music, :Math])
-
+#
 foreach(keys(df)) do student
     classes = df[student]
     # let's make this idempotent by adding student only if they aren't in the system
@@ -91,12 +90,7 @@ unique(rvrv(
         :src)]))
 # ... select distinct d.id
 
-# from d where
-#   d.src ∈ filter(!isnothing, infer_states(d)) ||
-#   d.src ∈ d[:res] ||
-#   d.src ∈ d[:sum] ||
-#   d.src ∈ d[(from d where d.op1 ∈ blacklist select d.id), :tgt]
-# select distinct d.id
+
 
 s = ACSetSelect(:E; what=SelectColumns(:E => :_id), 
             on=nothing, 
@@ -117,3 +111,93 @@ parts(g, :E)[g[:src] .== filter(!isnothing, [1]) .&&
              g[:src] .== [4] .&&
              g[:src] .== [2]
             ]
+
+
+import FunSQL: From, Select, Where
+mutable struct ACSetSQLNode
+    from::Symbol
+    cond::Union{Vector{Tuple{Symbol, Symbol, Any}}, Nothing}
+    select::Union{Symbol, Vector{Symbol}, Nothing}
+end
+struct ◊Ob
+    x::Symbol
+end
+◊Ob(xs...) = ◊Ob.([xs...])
+From(table::◊Ob) = ACSetSQLNode(table.x, nothing, Symbol[])
+function From(sql::ACSetSQLNode; table::◊Ob)
+    sql.from = [sql.from; table.x]
+    sql
+end
+function Where(sql::ACSetSQLNode; lhs::Symbol, op::Symbol, rhs::Any)
+    sql.cond = if !isnothing(sql.cond)
+        [sql.cond; (lhs, op, rhs)]
+    else
+        [(lhs, op, rhs)]
+    end
+    sql
+end
+function Where(lhs::Symbol, op::Symbol, rhs::Any)
+    sql -> Where(sql; lhs=lhs, op=op, rhs=rhs)
+end
+function Select(sql::ACSetSQLNode; columns::Union{Symbol, Vector{Symbol}})
+    push!(sql.select, columns...)
+    sql
+end
+function Select(cols::Union{◊Ob, Vector{◊Ob}})
+    if cols isa Vector
+        sql -> Select(sql; columns=getfield.(cols, :x))
+    else
+        sql -> Select(sql; columns=[cols.x])
+    end
+end
+#
+q = From(◊Ob(:V)) |> Select(◊Ob(:a))
+
+q = From(◊Ob(:Junct)) |> 
+        Where(:student, :∈, 1) |>
+        Where(:class, :∈, 2) |>
+        Select(◊Ob(:a, :b))
+
+q(jd)
+
+using MLStyle
+function (q::ACSetSQLNode)(acset::ACSet)
+    indices = map(q.cond) do (left, _, right)
+        acset[left] .∈ @match right begin
+            ::Symbol => acset[right]
+            ::ACSetSQLNode => right(acset)
+            _ => [right]
+        end
+    end
+    # decided OR for now
+    idx = [l || r for (l,r) ∈ zip(indices...)]
+    result = parts(acset, q.from)[idx]
+end
+
+# FROM d WHERE
+#   d.src ∈ filter(!isnothing, infer_states(d)) ||
+#   d.src ∈ d[:res] ||
+#   d.src ∈ d[:sum] ||
+#   d.src ∈ d[
+#       # From(◊Ob(:d)) |> Where(◊op1, :∈, vector{symbol}) |> Select(◊Ob(:_id))
+#       (from d where d.op1 ∈ blacklist select d.id), 
+#   :tgt]
+#   from d
+#   where _id = (from d
+#   where op1 ∈ X
+#   select _id)
+#   select tgt
+#   --------
+#   from d
+#   where op1 ∈ X
+#   select _tgt
+#   
+# select distinct d.id
+
+q = From(◊Ob(:Op1)) |>
+Where(:src, :∈, infer_states(d)) |> # infer states
+Where(:src, :∈, d[:res] ∪ d[:sum]) # res
+# Where(:src, :∈, From(◊Ob(:Op1)) |>
+          # Where(:op1, :∈, :Δ) |>
+          # Select(◊Ob(:tgt)))
+
