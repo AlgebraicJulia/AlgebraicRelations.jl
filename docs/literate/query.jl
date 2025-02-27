@@ -57,4 +57,5 @@ q = From(◊Ob(:Student)) |>
 Where(:Student, From(◊Ob(:Junct)) |> Select(◊Ob(:student))) &
 Where(:name, :Gregorio) | Where(:name, :Fiona) |> Select(◊Ob(:name))
 
-process_wheres(q.cond[1], jd)
+# TODO doesn't work
+From(◊Ob(:Student)) |> Where(:name, :Georgio) |> Select(◊Ob(:name))

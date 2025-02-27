@@ -126,11 +126,11 @@ end
 
 function process_wheres(cond::Cond, acset::ACSet)
     schema = acset_schema(acset)
-        values = cond.lhs ∈ objects(schema) ? parts(acset, cond.lhs) : acset[cond.lhs]
-        @match cond.rhs begin
-            ::SQLACSetNode => map(values) do x; x ∈ cond.rhs(acset) end
-            _ => map(x -> cond.rhs isa Vector ? x ∈ cond.rhs : x == cond.rhs, values)
-        end
+    values = cond.lhs ∈ objects(schema) ? parts(acset, cond.lhs) : acset[cond.lhs]
+    @match cond.rhs begin
+        ::SQLACSetNode => map(values) do x; x ∈ cond.rhs(acset) end
+        _ => map(x -> cond.rhs isa Vector ? x ∈ cond.rhs : x == cond.rhs, values)
+    end
 end
 
 # function process_wheres(conds::Vector{Cond}, acset)
@@ -145,7 +145,6 @@ end
 
 function process_wheres(w::AndWhere, acset::ACSet)
     isempty(w.conds) && return nothing
-    @info "and! $(process_wheres(w.conds, acset))"
     reduce((x,y) -> x .& y, process_wheres(w.conds, acset))
 end
 
