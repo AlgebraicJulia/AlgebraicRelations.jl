@@ -46,10 +46,15 @@ end
 res=query(jd, select, table_type=DataFrame)
 
 q = From(◊Ob(:Student)) |> Select(◊Ob(:name))
+
 q(jd)
 
 q = From(◊Ob(:Student)) |> 
     Where(:Student, From(◊Ob(:Junct)) |> Select(◊Ob(:student))) |> 
     Select(◊Ob(:name))
-q(jd)
 
+q = From(◊Ob(:Student)) |>
+Where(:Student, From(◊Ob(:Junct)) |> Select(◊Ob(:student))) &
+Where(:name, :Gregorio) | Where(:name, :Fiona) |> Select(◊Ob(:name))
+
+process_wheres(q.cond[1], jd)
