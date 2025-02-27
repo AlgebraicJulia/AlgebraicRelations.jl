@@ -2,10 +2,10 @@ module MySQLACSetsExt
 
 using ACSets
 using AlgebraicRelations
-import AlgebraicRelations: tostring, tosql
+import AlgebraicRelations: tosql
 
 using FunSQL
-using FunSQL: reflect
+using FunSQL: render, reflect
 using MLStyle
 using MySQL
 
@@ -58,25 +58,28 @@ end
 
 function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, u::ACSetUpdate) 
     cols = join(columns(u.values), ", ")
-    wheres = !isnothing(u.wheres) ? tostring(vas, u.wheres) : ""
+    wheres = !isnothing(u.wheres) ? render(vas, u.wheres) : ""
+    @info wheres
     "UPDATE $(u.table) SET $(tosql(vas, u.values)) " * wheres * ";"
 end
 
 # TODO might have to refactor so we can reuse code for show method
 function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, s::ACSetSelect)
     from = s.from isa Vector ? join(s.from, ", ") : s.from
-    qty = tostring(vas, s.qty)
-    join = !isnothing(s.join) ? tostring(vas, s.join) : " "
-    wheres = !isnothing(s.wheres) ? tostring(vas, s.wheres) : ""
+    qty = render(vas, s.qty)
+    join = !isnothing(s.join) ? render(vas, s.join) : " "
+    wheres = !isnothing(s.wheres) ? render(vas, s.wheres) : ""
     "SELECT $qty FROM $from " * join * wheres * ";"
 end
 
 function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, j::ACSetJoin)
-    "$(j.type) JOIN $(j.table) ON $(tostring(vas, j.on))"
+    "$(j.type) JOIN $(j.table) ON $(render(vas, j.on))"
 end
+
 function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, ons::Vector{SQLEquation})
-    join(tostring.(Ref(vas), ons), " AND ")
+    join(render.(Ref(vas), ons), " AND ")
 end
+
 function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, eq::SQLEquation)
     "$(eq.lhs.first).$(eq.rhs.second) = $(eq.rhs.first).$(eq.rhs.second)"
 end
@@ -84,7 +87,7 @@ end
 function FunSQL.render(vas::VirtualACSet{MySQL.Connection}, qty::SQLSelectQuantity)
     @match qty begin
         ::SelectAll || ::SelectDistinct || ::SelectDistinctRow => "*"
-        SelectColumns(cols) => join(tostring.(Ref(vas), cols), ", ")
+        SelectColumns(cols) => join(render.(Ref(vas), cols), ", ")
     end
 end
 
@@ -139,7 +142,7 @@ end
 
 # convenience
 function AlgebraicRelations.ForeignKeyChecks(vas::VirtualACSet{MySQL.Connection}, stmt::String)
-    l, r = tostring.(Ref(conn), ForeignKeyChecks.([false, true]))
+    l, r = render.(Ref(conn), ForeignKeyChecks.([false, true]))
     wrap(stmt, l, r)
 end
 

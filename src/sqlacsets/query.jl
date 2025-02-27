@@ -17,7 +17,7 @@ export ◊Ob
 ◊Ob(xs...) = ◊Ob.([xs...])
 
 # TODO handle nothing case
-From(table::◊Ob) = SQLACSetNode(table.x, [], Symbol[])
+From(table::◊Ob) = SQLACSetNode(table.x; cond=[], select=Symbol[])
 
 # TODO looks like we don't do this anymore. From is singleton for the time being.
 function From(sql::SQLACSetNode; table::◊Ob)
@@ -76,7 +76,7 @@ function (q::SQLACSetNode)(acset::ACSet)
     idx = @match process_wheres(q, acset) begin
         ::Nothing => nothing
         indices::Vector{Vector{Bool}} => if length(indices) > 1
-            [l || r for (l,r) ∈ zip(indices...)]
+                reduce((x,y)-> x .| y, indices)
             else
                 only(indices)
             end
@@ -85,8 +85,10 @@ function (q::SQLACSetNode)(acset::ACSet)
     result = isnothing(idx) ? parts(acset, q.from) : parts(acset, q.from)[idx]
     isempty(result) && return []
     @match q.select begin
-        ::Nothing || [:_id] => return result
-        ::Symbol => subpart(acset, q.select)[result]
+        ::Nothing || [:_id] || :_id => return result
+        ::Symbol => begin
+            subpart(acset, result, q.select)
+        end
         selects => map(selects) do select
             subpart(acset, select)[result]
         end

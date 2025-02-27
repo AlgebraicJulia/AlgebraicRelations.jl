@@ -67,8 +67,8 @@ unique(rvrv(
 
 q = From(◊Ob(:Op1)) |>
 Where(:src, :∈, infer_states(d)) |> # infer states
-Where(:src, :∈, d[:res] ∪ d[:sum]) # res
-# Where(:src, :∈, From(◊Ob(:Op1)) |>
-          # Where(:op1, :∈, :Δ) |>
-          # Select(◊Ob(:tgt)))
+Where(:src, :∈, d[:res] ∪ d[:sum]) |> # res
+Where(:src, :∈, From(◊Ob(:Op1)) |>
+          Where(:op1, :∈, :Δ) |>
+          Select(◊Ob(:tgt)))
 

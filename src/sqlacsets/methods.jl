@@ -2,6 +2,7 @@ using MLStyle.Modules.Cond
 
 using DataFrames
 using FunSQL: reflect
+import FunSQL: render
 
 function tostring end
 export tostring
@@ -48,7 +49,7 @@ function toacset(vas::VirtualACSet{Conn}) where Conn
     # instantiate 
     add_parts!(acset, ob, nrow(vas.view))
     for (name, column) in pairs(eachcol(subview))
-        fill!(acset, kvs[name].second, Int64(maximum(column))) # whattabout symbols?
+        ensure_size!(acset, kvs[name].second, Int64(maximum(column))) # whattabout symbols?
         set_subpart!(acset, name, Int64.(vas.view[!, name]))
     end
     acset
@@ -58,7 +59,8 @@ export toacset
 function reload! end
 export reload!
 
-function FunSQL.render(vas::VirtualACSet{Conn}, args...; kwargs...) where Conn end
+function render(vas::VirtualACSet{Conn}, args...; kwargs...) where Conn end
+export render
 
 # TODO generate multiple statements, then decide to execute single or multiple
 function execute!(vas::VirtualACSet{Conn}, stmt::String) where Conn
@@ -70,7 +72,7 @@ export execute!
 
 function execute!(vas::VirtualACSet{Conn}, query::SQLTerms) where Conn
     result = @match query begin
-        ::ACSetInsert => DBInterface.execute(vas.conn.raw, render(vas, query)) # wants a prepared FunSQL statement
+        ::ACSetInsert || ::ACSetUpdate => DBInterface.execute(vas.conn.raw, render(vas, query)) # wants a prepared FunSQL statement
         _ => DBInterface.execute(vas.conn, render(vas, query))
     end
     DataFrames.DataFrame(result)
@@ -82,7 +84,7 @@ function ACSet!(vas::VirtualACSet{Conn}, query::SQLTerms) where Conn
 end
 
 function create!(vas::VirtualACSet{Conn}, x::SimpleACSet) where Conn
-    stmt = render(vas, Create(x))
+    stmt = render(vas, ACSetCreate(x))
     DBInterface.executemultiple(conn, stmt)
 end
 export create!
@@ -93,14 +95,14 @@ function create!(vas::VirtualACSet{Conn}) where Conn
 end
 
 function insert!(vas::VirtualACSet{Conn}, acset::SimpleACSet) where Conn
-    insert_stmts = render.(Ref(vas), Insert(v.conn, acset))
+    insert_stmts = render.(Ref(vas), ACSetInsert(v.conn, acset))
     query = DBInterface.executemultiple(vas.conn.raw, insert_stmts)
     DataFrames.DataFrame(query)
 end
 
-function update!(v::VirtualACSet, acset::SimpleACSet)
-    update_stmts = render(v.conn, Update(v.conn, acset))
-    query = DBInterface.executemultiple(conn, update_stmts)
+function update!(vas::VirtualACSet, acset::SimpleACSet)
+    update_stmts = render(vas, ACSetUpdate(vas.conn, acset))
+    query = DBInterface.executemultiple(vas.conn.raw, update_stmts)
     DataFrames.DataFrame(query)
 end
 

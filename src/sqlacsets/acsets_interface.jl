@@ -65,6 +65,7 @@ end
 # TODO names::Vector{Symbol}
 function ACSetInterface.incident(vas::VirtualACSet, ids::Vector{Int}, column::Symbol)
     table = tablefromcolumn(vas, column)
+    # XXX _id
     query = FROM(table) |> WHERE(FUN("in", column, ids...)) |> SELECT(:_id)
     df = DBInterface.execute(vas.conn, query) |> DataFrames.DataFrame
 end
@@ -92,14 +93,14 @@ end
 
 function ACSetInterface.set_subpart!(vas::VirtualACSet, 
         table::Symbol, values::Vector{<:NamedTuple{T}}; wheres::Union{WhereClause, Nothing}=nothing) where T 
-    query = execute(vas!, Update(table, values, wheres))
+    query = execute!(vas, ACSetUpdate(table, values, wheres))
     df = DataFrames.DataFrame(query); metadata!(df, "ob", table, style=:note)
     df
 end
 
 # clear_subpart!
 
-function ACSetInterface.clear_subpart!(acset::VirtualACSet, args...) end
+function ACSetInterface.clear_subpart!(vas::VirtualACSet, args...) end
 
 function ACSetInterface.rem_part!(vas::VirtualACSet, table::Symbol, id::Int)
     rem_parts!(vas, table, [id])
