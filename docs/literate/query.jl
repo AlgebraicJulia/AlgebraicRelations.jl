@@ -1,6 +1,7 @@
 using Catlab
 using ACSets
 using AlgebraicRelations
+using DataFrames
 
 # Catlab.jl allows us to build conjunctive queries on ACSets with the `@relation` macro. In this example, we will show how we can specify conjunctive queries with a FunSQL-like syntax. Let's load up our student-class schema again.
 @present SchJunct(FreeSchema) begin
@@ -44,31 +45,11 @@ select = @relation (student=student, class=class, name=name, subject=subject) be
 end
 res=query(jd, select, table_type=DataFrame)
 
-# given an ACSet
-sch = SQLSchema(SchJunct)
-tab = SQLTable(sch) # TODO this is problematic. not the right type
-c = SQLCatalog(values(tab)...)
+q = From(◊Ob(:Student)) |> Select(◊Ob(:name))
+q(jd)
 
-to_funsql(select, sch)
-
-unique(rvrv(
-    [incident(d, Vector{Int64}(filter(!isnothing, infer_states(d))), :src),
-     # d.src in [filter(!isnothing, infer_states(d))]
-     incident(d, d[:res], :src), # d.src == d[res]
-     incident(d, d[:sum], :src), # d.src == d[sum]
-     incident(d,
-              # `d`.`
-              d[collect(Iterators.flatten(
-                                          # from `d` where d.op1 ∈ black_list select `_id`
-                                          incident(d, collect(black_list), :op1)
-                                         )), :tgt], 
-        :src)]))
-# ... select distinct d.id
-
-q = From(◊Ob(:Op1)) |>
-Where(:src, :∈, infer_states(d)) |> # infer states
-Where(:src, :∈, d[:res] ∪ d[:sum]) |> # res
-Where(:src, :∈, From(◊Ob(:Op1)) |>
-          Where(:op1, :∈, :Δ) |>
-          Select(◊Ob(:tgt)))
+q = From(◊Ob(:Student)) |> 
+    Where(:Student, From(◊Ob(:Junct)) |> Select(◊Ob(:student))) |> 
+    Select(◊Ob(:name))
+q(jd)
 

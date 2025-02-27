@@ -20,10 +20,13 @@ conn = DBInterface.connect(MySQL.Connection, "localhost", "mysql", db="acsets",
     Weight::AttrType
     weight::Attr(E,Weight)
 end
-@acset_type WeightedLabeledGraph(S # TODO dump into StructACSetchWeightedLabeledGraph, index=[:src, :tgt]) <: AbstractLabeledGraph
+@acset_type WeightedLabeledGraph(SchWeightedLabeledGraph, index=[:src, :tgt]) <: AbstractLabeledGraph
 g = erdos_renyi(WeightedLabeledGraph{Symbol,Float64}, 5, 0.25);
 g[:, :label] = Symbol.(floor.(rand(nv(g)) * nv(g)));
 g[:, :weight] = floor.(rand(ne(g)) .* 100);
+
+# Inspect ACSet
+g
 
 # We'd like the ACSet to mirror. Let's virtualize an ACSet. This is a new object that sustains a relationship between our database and our ACSet. 
 vas = VirtualACSet(conn, g) # TODO dump into StructACSet
@@ -31,32 +34,32 @@ vas = VirtualACSet(conn, g) # TODO dump into StructACSet
 # Right now, it does not verify that the database agrees with the ACSet. We would need to `diff` ACSets.
 subpart(vas, :V)
 
-# TODO replace with Render execute
-# c = Create(g)
-# execute!(vas, c)
-
 # This lets us build a lot of insert statements. We join them together.
 i = join(FunSQL.render.(Ref(vas), ACSetInsert(vas, g)), " ")
 
-execute!(vas, i)
+execute!.(Ref(vas), ACSetInsert(vas, g))
 
-incident(vas, nparts(vas, :V).count[1] - 7, :src)
+
+nparts(vas, :V)
+
+subpart(vas, :V)
+
+subpart(vas, :E)
+
+incident(vas, nparts(vas, :V).count[1], :tgt)
 
 # TODO move "LastRowId" to a type so we can dispatch on it
-add_part!(vas, :V, (_id = nparts(vas, :V).count[1] + 1, label = 1)) 
+add_part!(vas, :V, (_id = 1, label = "rhombus")) 
 
 # 
-rem_part!(vas, :V, 10) # this will fail because of db constraints
+rem_part!(vas, :V, 1)
+
+# XXX doesn't return 
+add_part!(vas, :V, (_id=1, label="spagumbus"))
 
 rem_part!(vas, :E, 10)
 
 subpart(vas, :V)
-
-# s0 = ACSetSelect(:V, what=SelectColumns(:V => :label))
-# execute!(vas, s0)
-
-# s1 = ACSetSelect(:E, what=SelectColumns(:E => :_id, :E => :tgt), wheres=WhereClause(:in, :_id => [1,2,3]))
-# execute!(vas, s1)
 
 # TODO should be able to pass in Julia expressions for conditions like `where`
 set_subpart!(vas, :V, [(label=0,)]; wheres=WhereClause(:in, :_id => [1]))

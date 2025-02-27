@@ -9,9 +9,13 @@ using DBInterface
 
 # query an ACSet with a SQL syntax
 include("query.jl")
+
 # query a table using the ACSets interface
-include("syntax.jl")
-include("methods.jl")
-include("acsets_interface.jl")
+
+include("syntax.jl") # hand-rolled SQL syntax
+
+include("methods.jl") # the VirtualACSet
+
+include("acsets_interface.jl") # ACSetInterface
 
 end

@@ -64,15 +64,13 @@ export render
 
 # TODO generate multiple statements, then decide to execute single or multiple
 function execute!(vas::VirtualACSet{Conn}, stmt::String) where Conn
-    result = DBInterface.execute(vas.conn, stmt)
-    reload!(vas)
-    DataFrames.DataFrame(result)
+    DBInterface.executemultiple(vas.conn.raw, stmt)
 end
 export execute!
 
 function execute!(vas::VirtualACSet{Conn}, query::SQLTerms) where Conn
     result = @match query begin
-        ::ACSetInsert || ::ACSetUpdate => DBInterface.execute(vas.conn.raw, render(vas, query)) # wants a prepared FunSQL statement
+        ::ACSetInsert || ::ACSetUpdate || ::ACSetDelete => DBInterface.execute(vas.conn.raw, render(vas, query)) # wants a prepared FunSQL statement
         _ => DBInterface.execute(vas.conn, render(vas, query))
     end
     DataFrames.DataFrame(result)

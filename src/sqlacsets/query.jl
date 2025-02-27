@@ -39,6 +39,8 @@ export Where
 function Where(lhs::Symbol, op::Symbol, rhs::Any)
     sql -> Where(sql; lhs=lhs, op=op, rhs=rhs)
 end
+Where(lhs::Symbol, rhs::Any) = Where(lhs, :∈, rhs)
+
 
 function Select(sql::SQLACSetNode; columns::Union{Symbol, Vector{Symbol}})
     push!(sql.select, columns...)
@@ -84,25 +86,24 @@ function (q::SQLACSetNode)(acset::ACSet)
     end
     result = isnothing(idx) ? parts(acset, q.from) : parts(acset, q.from)[idx]
     isempty(result) && return []
-    @match q.select begin
-        ::Nothing || [:_id] || :_id => return result
-        ::Symbol => begin
-            subpart(acset, result, q.select)
-        end
+    selected = @match q.select begin
+        ::Nothing || Symbol[] || [:_id] || :_id => return result
+        ::Symbol => subpart(acset, result, q.select)
         selects => map(selects) do select
             subpart(acset, select)[result]
         end
     end
+    collect(Iterators.flatten(selected))
 end
 
 function process_wheres(q::SQLACSetNode, acset::ACSet)
     isempty(q.cond) && return nothing
+    schema = acset_schema(acset)
     whereindices = map(q.cond) do (left, _, right)
+        values = left ∈ objects(schema) ? parts(acset, left) : acset[left]
         @match right begin
-            ::SQLACSetNode => map(acset[left]) do x
-                x ∈ right(acset)
-            end
-            _ => map(x -> right isa Vector ? x ∈ right : x == right, acset[left])
+            ::SQLACSetNode => map(values) do x; x ∈ right(acset) end
+            _ => map(x -> right isa Vector ? x ∈ right : x == right, values)
         end
     end
 end
