@@ -1,8 +1,8 @@
 using Catlab
 using ACSets
 using AlgebraicRelations
+#
 using DataFrames
-
 # Catlab.jl allows us to build conjunctive queries on ACSets with the `@relation` macro. In this example, we will show how we can specify conjunctive queries with a FunSQL-like syntax. Let's load up our student-class schema again.
 @present SchJunct(FreeSchema) begin
     Name::AttrType
@@ -50,7 +50,7 @@ q(jd)
 
 q = From(:Student) |> 
     Where(:Student, From(:Junct) |> Select(:student)) |> 
-    Select(:name);
+    Select(:name); # XXX Selecting `Student` does not work
 q(jd)
 
 q = From(:Student) |>
@@ -59,7 +59,13 @@ Where(:name, :Gregorio) | Where(:name, :Fiona) |> Select(:name);
 q(jd)
 
 q = From(:Student) |> Where(:name, [:Gregorio, :Fiona]) |> Select(:name);
-q(jd)
+@assert q(jd) == [:Fiona, :Gregorio]
 
-q = From(:Student) |> Where(:name, :Gregorio) |> Select(:name);
-q(jd)
+q = From(:Student) |> Where(:name, ∉, :Gregorio) |> Select(:name);
+@assert q(jd) == [:Fiona, :Heather]
+
+isGregorio(x::Symbol) = x == :Gregorio
+@assert !isGregorio(:Heather)
+
+q = From(:Student) |> Where(:name, !isGregorio) |> Select(:name);
+@assert q(jd) == [:Fiona, :Heather]

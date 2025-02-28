@@ -1,16 +1,15 @@
-import FunSQL: From, Select, Where
-
 abstract type AbstractCondition end
 export AbstractCondition
 
-@kwdef struct WhereCondition <: AbstractCondition
+struct WhereCondition <: AbstractCondition
     lhs::Symbol
-    op::Symbol = :∈
+    op::Function
     rhs::Any
 end
 export WhereCondition
+# TODO we don't actually need to store an operator as a generic. If we want to
+# have functions, we can just pass |> as the operator.
 
-# TODO what about OR?
 @as_record struct AndWhere <: AbstractCondition
 	conds::Vector{<:AbstractCondition}
 	# constructors
@@ -67,13 +66,6 @@ function Base.:|(n::SQLACSetNode, a::AbstractCondition)
     n
 end
 
-struct ◊Ob
-    x::Symbol
-end
-export ◊Ob
-
-◊Ob(xs...) = ◊Ob.([xs...])
-
 # TODO handle nothing case
 From(table::Symbol) = SQLACSetNode(table; cond=AbstractCondition[], select=Symbol[])
 
@@ -84,29 +76,15 @@ function From(sql::SQLACSetNode; table::Symbol)
 end
 export From
 
-# function Cond(sql::SQLACSetNode; lhs::Symbol, op::Symbol=:∈, rhs::Any)
-#     sql.cond = if !isnothing(sql.cond)
-#         [sql.cond; Cond(lhs, op, rhs)]
-#     else
-#         [Cond(lhs, op, rhs)]
-#     end
-#     sql
-# end
-# export Where
-
-function Where(lhs::Symbol, op::Symbol, rhs::Any)
-	WhereCondition(lhs=lhs, op=op, rhs=rhs)
-end
-Where(lhs::Symbol, rhs::Any) = Where(lhs, :∈, rhs)
+function Where end
 export Where
 
-function Where(lhs::Symbol, op::Symbol, rhs::Any)
-    WhereCondition(lhs=lhs, op=Val(op), rhs=rhs)
+function Where(lhs::Symbol, op::Function, rhs::Any)
+    WhereCondition(lhs, op, rhs)
 end
 
-function WhereCondition(lhs::Symbol, op::Union{Val{:in}, Val{:∈}}, rhs::Symbol)
-    In
-end
+Where(lhs::Symbol, rhs::Function) = Where(lhs, |>, rhs)
+Where(lhs::Symbol, rhs::Any) = Where(lhs, ∈, rhs)
 
 function Select(sql::SQLACSetNode; columns::Union{Symbol, Vector{Symbol}})
     push!(sql.select, columns...)
@@ -130,16 +108,12 @@ function process_wheres(cond::WhereCondition, acset::ACSet)
     schema = acset_schema(acset)
     values = cond.lhs ∈ objects(schema) ? parts(acset, cond.lhs) : acset[cond.lhs]
     @match cond.rhs begin
-        ::SQLACSetNode => map(x -> x ∈ cond.rhs(acset), values)
-        ::Vector => map(x -> x ∈ cond.rhs, values)
-        _ => map(x -> x == cond.rhs, values)
+        ::SQLACSetNode => map(x -> cond.op(x, cond.rhs(acset)), values)
+        ::Vector => map(x -> cond.op(x, cond.rhs), values)
+        ::Function => map(x -> cond.rhs(x), values)
+        _ => map(x -> cond.op(x, [cond.rhs]), values)
     end
 end
-
-# function process_wheres(conds::Vector{Cond}, acset)
-# 	isempty(conds) && return nothing
-# 	process_wheres.(conds, Ref(acset))
-# end
 
 function process_wheres(w::OrWhere, acset::ACSet)
     isempty(w.conds) && return nothing
@@ -158,7 +132,7 @@ q = From(:Summand)
 ```
 A query with the select specified. `_id` is reserved for the part.
 ```
-q = From(◊Ob(:Summand)) |>
+q = From(:Summand) |>
 Select(:_id)
 ```
 A query with two where statements. One Where uses another query
