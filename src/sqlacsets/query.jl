@@ -146,14 +146,24 @@ function (q::SQLACSetNode)(acset::ACSet)
     idx = process_wheres(q.cond, acset)
     result = isnothing(idx) ? parts(acset, q.from) : parts(acset, q.from)[first(idx)]
     isempty(result) && return []
+    schema = acset_schema(acset)
     selected = @match q.select begin
         ::Nothing || Symbol[] || [:_id] || :_id => return result
         ::Symbol => subpart(acset, result, q.select)
         selects => map(selects) do select
-            subpart(acset, select)[result]
+            acset_select(acset, select)[result]
         end
     end
     collect(Iterators.flatten(selected))
 end
+
+function acset_select(acset::ACSet, select::Symbol; schema::Any=acset_schema(acset))
+    if select ∈ objects(schema)
+        parts(acset, select)
+    else
+        subpart(acset, select)
+    end
+end
+
 
 DBInterface.execute(acset::ACSet, q::SQLACSetNode) = q(acset)

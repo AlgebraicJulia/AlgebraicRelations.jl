@@ -46,12 +46,22 @@ end
 res=query(jd, select, table_type=DataFrame)
 
 q = From(:Student) |> Select(:name);
-q(jd)
+@assert q(jd) == [:Fiona, :Gregorio, :Heather]
 
 q = From(:Student) |> 
     Where(:Student, From(:Junct) |> Select(:student)) |> 
-    Select(:name); # XXX Selecting `Student` does not work
-q(jd)
+    Select(:name);
+@assert q(jd) == [:Fiona, :Gregorio, :Heather]
+
+q = From(:Student) |> 
+    Where(:Student, From(:Junct) |> Select(:student)) |> 
+    Select(:Student);
+@assert q(jd) == [1,2,3]
+
+# not specifying a select statement defaults to the From
+q = From(:Student) |> 
+    Where(:Student, From(:Junct) |> Select(:student)); 
+@assert q(jd) == [1,2,3]
 
 q = From(:Student) |>
 Where(:Student, From(:Junct) |> Select(:student)) &
