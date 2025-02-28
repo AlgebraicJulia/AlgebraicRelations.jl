@@ -45,17 +45,18 @@ select = @relation (student=student, class=class, name=name, subject=subject) be
 end
 res=query(jd, select, table_type=DataFrame)
 
-q = From(◊Ob(:Student)) |> Select(◊Ob(:name))
-
+q = From(◊Ob(:Student)) |> Select(◊Ob(:name));
 q(jd)
 
 q = From(◊Ob(:Student)) |> 
     Where(:Student, From(◊Ob(:Junct)) |> Select(◊Ob(:student))) |> 
-    Select(◊Ob(:name))
+    Select(◊Ob(:name));
+q(jd)
 
 q = From(◊Ob(:Student)) |>
 Where(:Student, From(◊Ob(:Junct)) |> Select(◊Ob(:student))) &
-Where(:name, :Gregorio) | Where(:name, :Fiona) |> Select(◊Ob(:name))
+Where(:name, :Gregorio) | Where(:name, :Fiona) |> Select(◊Ob(:name));
+q(jd)
 
-# TODO doesn't work
-From(◊Ob(:Student)) |> Where(:name, :Georgio) |> Select(◊Ob(:name))
+q = From(◊Ob(:Student)) |> Where(:name, :Gregorio) |> Select(◊Ob(:name));
+q(jd)

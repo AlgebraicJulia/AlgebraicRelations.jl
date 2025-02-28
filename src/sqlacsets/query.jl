@@ -25,11 +25,6 @@ function Base.:&(a::S, b::T) where {T<:AbstractCondition, S<:AbstractCondition}
 	AndWhere(a, b)
 end
 
-function Base.:&(n::SQLACSetNode, a::AbstractCondition)
-	n.cond = n.cond & a
-	n
-end
-
 @as_record struct OrWhere <: AbstractCondition
 	conds::Vector{<:AbstractCondition}
 	# constructors
@@ -42,11 +37,6 @@ end
 
 function Base.:|(a::S, b::T) where {T<:AbstractCondition, S<:AbstractCondition}
     OrWhere(a, b)
-end
-
-function Base.:|(n::SQLACSetNode, a::AbstractCondition)
-    n.cond = n.cond | a
-    n
 end
 
 mutable struct SQLACSetNode
@@ -65,6 +55,16 @@ end
 function (ac::AbstractCondition)(node::SQLACSetNode)
 	push!(node.cond, ac)
 	node
+end
+
+function Base.:&(n::SQLACSetNode, a::AbstractCondition)
+	n.cond = n.cond & a
+	n
+end
+
+function Base.:|(n::SQLACSetNode, a::AbstractCondition)
+    n.cond = n.cond | a
+    n
 end
 
 struct ◊Ob
