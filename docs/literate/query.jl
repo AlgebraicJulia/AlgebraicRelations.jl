@@ -45,18 +45,21 @@ select = @relation (student=student, class=class, name=name, subject=subject) be
 end
 res=query(jd, select, table_type=DataFrame)
 
-q = From(◊Ob(:Student)) |> Select(◊Ob(:name));
+q = From(:Student) |> Select(:name);
 q(jd)
 
-q = From(◊Ob(:Student)) |> 
-    Where(:Student, From(◊Ob(:Junct)) |> Select(◊Ob(:student))) |> 
-    Select(◊Ob(:name));
+q = From(:Student) |> 
+    Where(:Student, From(:Junct) |> Select(:student)) |> 
+    Select(:name);
 q(jd)
 
-q = From(◊Ob(:Student)) |>
-Where(:Student, From(◊Ob(:Junct)) |> Select(◊Ob(:student))) &
-Where(:name, :Gregorio) | Where(:name, :Fiona) |> Select(◊Ob(:name));
+q = From(:Student) |>
+Where(:Student, From(:Junct) |> Select(:student)) &
+Where(:name, :Gregorio) | Where(:name, :Fiona) |> Select(:name);
 q(jd)
 
-q = From(◊Ob(:Student)) |> Where(:name, :Gregorio) |> Select(◊Ob(:name));
+q = From(:Student) |> Where(:name, [:Gregorio, :Fiona]) |> Select(:name);
+q(jd)
+
+q = From(:Student) |> Where(:name, :Gregorio) |> Select(:name);
 q(jd)

@@ -3,12 +3,12 @@ import FunSQL: From, Select, Where
 abstract type AbstractCondition end
 export AbstractCondition
 
-@kwdef struct Cond <: AbstractCondition
+@kwdef struct WhereCondition <: AbstractCondition
     lhs::Symbol
     op::Symbol = :∈
     rhs::Any
 end
-export Cond
+export WhereCondition
 
 # TODO what about OR?
 @as_record struct AndWhere <: AbstractCondition
@@ -47,7 +47,7 @@ mutable struct SQLACSetNode
 end
 export SQLACSetNode
 
-function (w::Cond)(node::SQLACSetNode)
+function (w::WhereCondition)(node::SQLACSetNode)
 	push!(node.cond, AndWhere([w]))
 	node
 end
@@ -75,11 +75,11 @@ export ◊Ob
 ◊Ob(xs...) = ◊Ob.([xs...])
 
 # TODO handle nothing case
-From(table::◊Ob) = SQLACSetNode(table.x; cond=AbstractCondition[], select=Symbol[])
+From(table::Symbol) = SQLACSetNode(table; cond=AbstractCondition[], select=Symbol[])
 
 # TODO looks like we don't do this anymore. From is singleton for the time being.
-function From(sql::SQLACSetNode; table::◊Ob)
-    sql.from = [sql.from; table.x]
+function From(sql::SQLACSetNode; table::Symbol)
+    sql.from = [sql.from; table]
     sql
 end
 export From
@@ -95,10 +95,18 @@ export From
 # export Where
 
 function Where(lhs::Symbol, op::Symbol, rhs::Any)
-	Cond(lhs=lhs, op=op, rhs=rhs)
+	WhereCondition(lhs=lhs, op=op, rhs=rhs)
 end
 Where(lhs::Symbol, rhs::Any) = Where(lhs, :∈, rhs)
 export Where
+
+function Where(lhs::Symbol, op::Symbol, rhs::Any)
+    WhereCondition(lhs=lhs, op=Val(op), rhs=rhs)
+end
+
+function WhereCondition(lhs::Symbol, op::Union{Val{:in}, Val{:∈}}, rhs::Symbol)
+    In
+end
 
 function Select(sql::SQLACSetNode; columns::Union{Symbol, Vector{Symbol}})
     push!(sql.select, columns...)
@@ -106,15 +114,9 @@ function Select(sql::SQLACSetNode; columns::Union{Symbol, Vector{Symbol}})
 end
 export Select
 
-function Select(cols::Union{◊Ob, Vector{◊Ob}})
-    if cols isa Vector
-		sql -> Select(sql; columns=getfield.(cols, :x))
-    else
-		sql -> Select(sql; columns=[cols.x])
-    end
+function Select(cols::Union{Symbol, Vector{Symbol}})
+    sql -> Select(sql; columns=[Symbol[];cols])
 end
-
-# ##
 
 function process_wheres end
 export process_wheres
@@ -124,12 +126,13 @@ function process_wheres(conds::Vector{<:AbstractCondition}, acset)
 	process_wheres.(conds, Ref(acset))
 end
 
-function process_wheres(cond::Cond, acset::ACSet)
+function process_wheres(cond::WhereCondition, acset::ACSet)
     schema = acset_schema(acset)
     values = cond.lhs ∈ objects(schema) ? parts(acset, cond.lhs) : acset[cond.lhs]
     @match cond.rhs begin
-        ::SQLACSetNode => map(values) do x; x ∈ cond.rhs(acset) end
-        _ => map(x -> cond.rhs isa Vector ? x ∈ cond.rhs : x == cond.rhs, values)
+        ::SQLACSetNode => map(x -> x ∈ cond.rhs(acset), values)
+        ::Vector => map(x -> x ∈ cond.rhs, values)
+        _ => map(x -> x == cond.rhs, values)
     end
 end
 
@@ -151,18 +154,18 @@ end
 """
 A query with no select overly-specified:
 ```
-q = From(◊Ob(:Summand))
+q = From(:Summand)
 ```
 A query with the select specified. `_id` is reserved for the part.
 ```
 q = From(◊Ob(:Summand)) |>
-Select(◊Ob(:_id))
+Select(:_id)
 ```
 A query with two where statements. One Where uses another query
 ```
-q = From(◊Ob(:Op1)) |>
+q = From(:Op1) |>
 Where(:src, :∈, invasion[:res] ∪ invasion[:sum] ∪ infer_states(invasion)) |>
-Where(:src, :∈, From(◊Ob(:Op1)) |> Where(:op1, :∈, blacklist) |> Select(◊Ob(:tgt)))
+Where(:src, :∈, From(:Op1) |> Where(:op1, :∈, blacklist) |> Select(:tgt))
 ```
 """
 function (q::SQLACSetNode)(acset::ACSet)
