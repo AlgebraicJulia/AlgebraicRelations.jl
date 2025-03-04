@@ -5,6 +5,30 @@ using Catlab.CategoricalAlgebra
 using Tables
 using SQLite
 
+using FunSQL
+using FunSQL: render, reflect
+using MLStyle
+
+function AlgebraicRelations.reload!(vas::VirtualACSet{SQLite.Connection})
+    conn = SQLite.DB()
+    vas.conn = FunSQL.DB(conn, catalog=reflect(conn))
+end
+
+# DB specific, type conversion
+tosql(::VirtualACSet{SQLite.Connection}, ::Type{<:Real}) = "REAL"
+tosql(::VirtualACSet{SQLite.Connection}, ::Type{<:AbstractString}) = "TEXT"
+tosql(::VirtualACSet{SQLite.Connection}, ::Type{<:Symbol}) = "TEXT"
+tosql(::VirtualACSet{SQLite.Connection}, ::Type{<:Integer}) = "INTEGER"
+tosql(::VirtualACSet{SQLite.Connection}, T::DataType) = error("$T is not supported in this MySQL implementation")
+# value conversion
+tosql(::VirtualACSet{SQLite.Connection}, ::Nothing) = "NULL"
+tosql(::VirtualACSet{SQLite.Connection}, x::T) where T<:Number = x
+tosql(::VirtualACSet{SQLite.Connection}, s::Symbol) = string(s)
+tosql(::VirtualACSet{SQLite.Connection}, s::String) = "\'$s\'"
+tosql(::VirtualACSet{SQLite.Connection}, x) = x
+
+
+
 function AlgebraicRelations.SQLSchema(db::SQLite.DB)
   sch = SQLSchema()
   tables = [t.name for t in SQLite.tables(db)]

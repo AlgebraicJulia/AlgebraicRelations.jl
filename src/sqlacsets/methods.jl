@@ -18,6 +18,11 @@ end
 export VirtualACSet
 # TODO we need to convert the `view` into an ACSet
 
+function VirtualACSet(conn::Conn) where Conn
+    c= FunSQL.DB(conn, catalog=reflect(conn))
+    VirtualACSet{Conn}(conn=c)
+end
+
 function VirtualACSet(conn::FunSQL.SQLConnection{Conn}, acs::A) where {Conn, A<:ACSet}
     VirtualACSet{Conn}(conn=conn, acsettype=typeof(acs))
 end

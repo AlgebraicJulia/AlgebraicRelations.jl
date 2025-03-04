@@ -7,15 +7,9 @@ using FunSQL
 using DataFrames
 using DBInterface
 
-# query an ACSet with a SQL syntax
-include("query.jl")
-
-# query a table using the ACSets interface
-
-include("syntax.jl") # hand-rolled SQL syntax
-
+# hand-rolled SQL syntax. necessary for DML operations
+include("syntax.jl") 
 include("methods.jl") # the VirtualACSet
-
 include("acsets_interface.jl") # ACSetInterface
 
 end

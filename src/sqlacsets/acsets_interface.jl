@@ -19,7 +19,10 @@ function ACSetInterface.nparts(vas::VirtualACSet{Conn}, table::Symbol)::DataFram
     DBInterface.execute(vas.conn, query) |> DataFrames.DataFrame
 end
 
-function ACSetInterface.maxpart(acset::VirtualACSet, table::Symbol) end
+function ACSetInterface.maxpart(vas::VirtualACSet, table::Symbol) 
+    query = From(table) |> Group() |> Select(Agg.max(:_id))
+    DBInterface.execute(vas.conn, query) |> DataFrames.DataFrame
+end
 
 function ACSetInterface.subpart(vas::VirtualACSet, table::Symbol)
     query = FROM(table) |> SELECT(*) 
@@ -27,14 +30,6 @@ function ACSetInterface.subpart(vas::VirtualACSet, table::Symbol)
     metadata!(df, "ob", table; style=:note)
     df
 end
-# sql
-
-# function ACSetInterface.subpart(vas::VirtualACSet, table::Symbol, what::SQLSelectQuantity=SelectAll())
-#     stmt = tostring(vas, Select(table; what=what))
-#     query = DBInterface.execute(vas.conn, stmt)
-#     df = DataFrames.DataFrame(query); metadata!(df, "ob", table; style=:note)
-#     df
-# end
 
 function tablefromcolumn(vas::VirtualACSet, column::Symbol)
     indices = map(values(vas.conn.catalog.tables)) do table

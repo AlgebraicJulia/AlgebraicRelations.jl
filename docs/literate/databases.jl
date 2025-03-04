@@ -29,7 +29,7 @@ g[:, :weight] = floor.(rand(ne(g)) .* 100);
 g
 
 # We'd like the ACSet to mirror. Let's virtualize an ACSet. This is a new object that sustains a relationship between our database and our ACSet. 
-vas = VirtualACSet(conn, g) # TODO dump into StructACSet
+vas = VirtualACSet(conn) # TODO dump into StructACSet
 
 # Right now, it does not verify that the database agrees with the ACSet. We would need to `diff` ACSets.
 subpart(vas, :V)
@@ -39,8 +39,9 @@ i = join(FunSQL.render.(Ref(vas), ACSetInsert(vas, g)), " ")
 
 execute!.(Ref(vas), ACSetInsert(vas, g))
 
-
 nparts(vas, :V)
+
+maxparts(vas, :V)
 
 subpart(vas, :V)
 
@@ -48,10 +49,11 @@ subpart(vas, :E)
 
 incident(vas, nparts(vas, :V).count[1], :tgt)
 
-# TODO move "LastRowId" to a type so we can dispatch on it
-add_part!(vas, :V, (_id = 1, label = "rhombus")) 
+subpart(vas, 4, :label)
 
-# 
+# TODO move "LastRowId" to a type so we can dispatch on it
+add_part!(vas, :V, (_id = only(maxpart(vas, :V).max) + 1, label = "rhombus")) 
+
 rem_part!(vas, :V, 1)
 
 # XXX doesn't return 
@@ -64,10 +66,9 @@ subpart(vas, :V)
 # TODO should be able to pass in Julia expressions for conditions like `where`
 set_subpart!(vas, :V, [(label=0,)]; wheres=WhereClause(:in, :_id => [1]))
 
-
+subpart(vas, 5, :_id)
 subpart(vas, 1, :tgt)
 subpart(vas, [1,2], :tgt)
-
 
 execute!(vas, s1)
 
@@ -76,7 +77,6 @@ execute!(vas, i)
 
 u=Update(:Persons, [(LastName="First", FirstName="Last")], WhereClause(:in, :PersonID => [1]))
 tostring(conn, u)
-
 
 ForeignKeyChecks(conn, tostring(conn, i))
 
