@@ -68,19 +68,23 @@ export reload!
 function render(vas::VirtualACSet{Conn}, args...; kwargs...) where Conn end
 export render
 
-# TODO generate multiple statements, then decide to execute single or multiple
-function execute!(vas::VirtualACSet{Conn}, stmt::AbstractString) where Conn
-    result = DBInterface.execute(vas.conn.raw, stmt)
-    DataFrames.DataFrame(result)
-end
-export execute!
+function execute! end
 
-function execute!(vas::VirtualACSet{Conn}, query::AbstractSQLTerm) where Conn
+# TODO generate multiple statements, then decide to execute single or multiple
+function execute!(vas::VirtualACSet{Conn}, stmt::AbstractString; formatter::Union{Nothing, DataType, Function}=DataFrame) where Conn
+    result = DBInterface.execute(vas.conn.raw, stmt)
+    isnothing(formatter) && return result
+    formatter(result)
+end
+
+function execute!(vas::VirtualACSet{Conn}, query::AbstractSQLTerm; formatter::Union{Nothing, DataType, Function}=DataFrame) where Conn
     result = @match query begin
-        ::ACSetInsert || ::ACSetUpdate || ::ACSetDelete => DBInterface.execute(vas.conn.raw, render(vas, query)) # wants a prepared FunSQL statement
+        # wants a prepared FunSQL statement
+        ::ACSetInsert || ::ACSetUpdate || ::ACSetDelete || ::ShowTables => DBInterface.execute(vas.conn.raw, render(vas, query)) 
         _ => DBInterface.execute(vas.conn, render(vas, query))
     end
-    DataFrames.DataFrame(result)
+    isnothing(formatter) && return result
+    formatter(result)
 end
 
 function ACSet!(vas::VirtualACSet{Conn}, query::SQLTerms) where Conn

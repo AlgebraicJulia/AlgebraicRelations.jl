@@ -112,4 +112,13 @@ function ACSetInterface.rem_parts!(vas::VirtualACSet, table::Symbol, ids::UnitRa
     rem_parts!(vas, table, collect(ids))
 end
 
-function ACSetInterface.cascading_rem_part!(acset::VirtualACSet, args...) end
+function ACSetInterface.cascading_rem_part!(vas::VirtualACSet, args...) end
+
+#
+function Schemas.objects(vas::VirtualACSet)
+    execute!(vas, ShowTables())
+end
+
+function Schemas.homs(vas::VirtualACSet) end
+
+function Schemas.arrows(vas::VirtualACSet) end

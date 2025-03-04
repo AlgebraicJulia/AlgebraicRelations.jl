@@ -132,12 +132,12 @@ function FunSQL.render(::VirtualACSet{SQLite.DB}, a::ACSetAlter)
     "ALTER TABLE $(a.refdom) ADD CONSTRAINT fk_$(ref) FOREIGN KEY ($(a.ref)) REFERENCES $(a.refcodom)(_id); "
 end
 
-function FunSQL.render(::VirtualACSet{SQLite.DB}, fkc::ForeignKeyChecks)
-    "SET FOREIGN_KEY_CHECKS = $(Int(fkc.bool)) ;"
-end
-
 function FunSQL.render(::VirtualACSet{SQLite.DB}, ::ShowTables)
     "SELECT name FROM sqlite_master WHERE type='table';"
+end
+
+function FunSQL.render(::VirtualACSet{SQLite.DB}, fkc::ForeignKeyChecks)
+    "SET FOREIGN_KEY_CHECKS = $(Int(fkc.bool)) ;"
 end
 
 # convenience

@@ -11,6 +11,7 @@ using DataFrames
 using MySQL # loads extension
 
 # Let's establish a connection to MariaDB.
+# TODO how can we make this dynamic
 conn = DBInterface.connect(MySQL.Connection, "localhost", "mysql", db="acsets", 
                     unix_socket="/var/run/mysqld/mysqld.sock")
 
@@ -31,6 +32,8 @@ g
 # We'd like the ACSet to mirror. Let's virtualize an ACSet. This is a new object that sustains a relationship between our database and our ACSet. 
 vas = VirtualACSet(conn) # TODO dump into StructACSet
 
+execute!(vas, ShowTables())
+
 # Right now, it does not verify that the database agrees with the ACSet. We would need to `diff` ACSets.
 subpart(vas, :V)
 
@@ -41,12 +44,13 @@ execute!.(Ref(vas), ACSetInsert(vas, g))
 
 nparts(vas, :V)
 
-maxparts(vas, :V)
+maxpart(vas, :V)
 
 subpart(vas, :V)
 
 subpart(vas, :E)
 
+# can we consume the query object
 incident(vas, nparts(vas, :V).count[1], :tgt)
 
 subpart(vas, 4, :label)

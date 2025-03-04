@@ -166,6 +166,10 @@ function FunSQL.render(::VirtualACSet{MySQL.Connection}, a::ACSetAlter)
     "ALTER TABLE $(a.refdom) ADD CONSTRAINT fk_$(ref) FOREIGN KEY ($(a.ref)) REFERENCES $(a.refcodom)(_id); "
 end
 
+function FunSQL.render(::VirtualACSet{MySQL.Connection}, ::ShowTables)
+    "SHOW TABLES;"
+end
+
 function FunSQL.render(::VirtualACSet{MySQL.Connection}, fkc::ForeignKeyChecks)
     "SET FOREIGN_KEY_CHECKS = $(Int(fkc.bool)) ;"
 end
