@@ -12,6 +12,7 @@ abstract type AbstractVirtualACSet end
 #### Reading large data materialized elsewhere
 @kwdef mutable struct VirtualACSet{Conn}
     conn::FunSQL.SQLConnection{Conn}
+    # TODO diagram of basic schemas
     acsettype::Union{Type{<:ACSet}, Nothing} = nothing
     view::Union{DataFrames.DataFrame, Nothing} = nothing
 end
@@ -68,12 +69,13 @@ function render(vas::VirtualACSet{Conn}, args...; kwargs...) where Conn end
 export render
 
 # TODO generate multiple statements, then decide to execute single or multiple
-function execute!(vas::VirtualACSet{Conn}, stmt::String) where Conn
-    DBInterface.executemultiple(vas.conn.raw, stmt)
+function execute!(vas::VirtualACSet{Conn}, stmt::AbstractString) where Conn
+    result = DBInterface.execute(vas.conn.raw, stmt)
+    DataFrames.DataFrame(result)
 end
 export execute!
 
-function execute!(vas::VirtualACSet{Conn}, query::SQLTerms) where Conn
+function execute!(vas::VirtualACSet{Conn}, query::AbstractSQLTerm) where Conn
     result = @match query begin
         ::ACSetInsert || ::ACSetUpdate || ::ACSetDelete => DBInterface.execute(vas.conn.raw, render(vas, query)) # wants a prepared FunSQL statement
         _ => DBInterface.execute(vas.conn, render(vas, query))
@@ -111,12 +113,6 @@ end
 
 function tosql end
 export tosql
-
-""" """
-function entuple(v::Values; f::Function=identity, values::Bool=true)
-    ["($(join(f.(vals), ",")))" for vals in values.(v.vals)]
-end
-export entuple
 
 # get attrs
 function getattrs(g::SimpleACSet, table::Symbol)

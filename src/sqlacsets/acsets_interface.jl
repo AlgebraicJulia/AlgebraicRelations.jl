@@ -6,7 +6,7 @@ using ACSets
 using DBInterface
 using FunSQL
 using FunSQL: SQLTable
-using FunSQL: Select, From, Where, Agg, Group, Fun, Get, SQLTable
+using FunSQL: Select, From, Where, Agg, Group, Fun, Get
 using FunSQL: FROM, SELECT, WHERE, FUN
 
 function (vas::VirtualACSet)(f::Function, args...; kwargs...)
@@ -60,7 +60,6 @@ end
 # TODO names::Vector{Symbol}
 function ACSetInterface.incident(vas::VirtualACSet, ids::Vector{Int}, column::Symbol)
     table = tablefromcolumn(vas, column)
-    # XXX _id
     query = FROM(table) |> WHERE(FUN("in", column, ids...)) |> SELECT(:_id)
     df = DBInterface.execute(vas.conn, query) |> DataFrames.DataFrame
 end

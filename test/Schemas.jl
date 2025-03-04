@@ -10,7 +10,6 @@ using DataFrames
 using SQLite
 using FunSQL: render, SQLDialect
 
-
 @present Business(FreeSchema) begin
     (val!Salary, Name)::AttrType
     (Employee, Manager, Income, Salary)::Ob
@@ -29,10 +28,16 @@ busSchema = SQLSchema(Business; types = Dict(:val!Salary => Float64, :Name => St
 db = SQLite.DB()
 splt_stmts = split(render_schema(busSchema), "\n")
 
+vas = VirtualACSet(db)
+
+for stmt in splt_stmts
+    execute!(vas, stmt)
+end
+
 @testset "Generate DB Schema" begin
   
 for stmt in splt_stmts
-    @test DBInterface.execute(db, stmt) isa SQLite.Query
+    @test execute!(vas, stmt) isa SQLite.Query
 end
 
 end

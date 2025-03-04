@@ -69,7 +69,9 @@ struct ACSetJoin
 end
 export ACSetJoin
 
-@data SQLTerms begin
+abstract type AbstractSQLTerm end
+
+@data SQLTerms <: AbstractSQLTerm begin
     ACSetInsert(table::Symbol, values::Values, wheres::Union{WhereClause, Nothing})
     ACSetUpdate(table::Symbol, values::Values, wheres::Union{WhereClause, Nothing})
     ACSetSelect(qty::SQLSelectQuantity, 
@@ -107,7 +109,10 @@ function ACSetUpdate(table::Symbol, vs::Vector{<:NamedTuple{T}}, wheres::Union{W
     ACSetUpdate(table, Values(table, vs), wheres)
 end
 
-abstract type DatabaseEnvironmentConfig end
+abstract type DatabaseEnvironmentConfig <: AbstractSQLTerm end
+
+struct ShowTables <: DatabaseEnvironmentConfig end
+export ShowTables
 
 struct ForeignKeyChecks <: DatabaseEnvironmentConfig 
     bool::Bool
