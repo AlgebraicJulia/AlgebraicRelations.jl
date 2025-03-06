@@ -4,11 +4,44 @@ using DataFrames
 using FunSQL: reflect
 import FunSQL: render
 
+abstract type AbstractDataSource end
+export AbstractDataSource
+
+struct Database <: AbstractDataSource
+    conn::FunSQL.SQLConnection
+end
+export Database
+
+function Database(conn::Conn) where Conn<:DBInterface.Connection
+    c = FunSQL.DB(conn, catalog=reflect(conn))
+    Database(c)
+end
+
+struct API <: AbstractDataSource end
+export API
+
+struct Vanilla <: AbstractDataSource end
+export Vanilla
+
+# TODO move to Catlab. This is a labeled graph whose edges are also labeled
+@present SchEdgeLabeledGraph <: SchLabeledGraph begin
+    Value::AttrType
+    value::Attr(V, Value)
+    EdgeLabel::AttrType
+    edgelabel::Attr(E, EdgeLabel)
+end
+@acset_type EdgeLabeledGraph(SchEdgeLabeledGraph)
+
+const DataFabric = EdgeLabeledGraph{Symbol, AbstractDataSource, Pair{Symbol, Symbol}}
+export DataFabric
+
+# VAS
 struct Log
     time::DateTime
     event
     Log(event::DataType) = new(Dates.now(), event)
 end
+export Log
 
 struct PagingInfo 
     startIndex::Int
@@ -17,8 +50,8 @@ end
 
 abstract type AbstractVirtualACSet end
 
-#### Reading large data materialized elsewhere
-@kwdef mutable struct VirtualACSet{Conn}
+# ### Reading large data materialized elsewhere
+@kwdef mutable struct VirtualACSet{Conn} <: AbstractVirtualACSet
     conn::FunSQL.SQLConnection{Conn}
     # TODO diagram of basic schemas
     acsettype::Union{Type{<:ACSet}, Nothing} = nothing
@@ -31,11 +64,11 @@ export VirtualACSet
 # TODO we need to convert the `view` into an ACSet
 
 function VirtualACSet(conn::Conn) where Conn
-    c= FunSQL.DB(conn, catalog=reflect(conn))
+    c = FunSQL.DB(conn, catalog=reflect(conn))
     VirtualACSet{Conn}(conn=c)
 end
 
-function VirtualACSet(conn::FunSQL.SQLConnection{Conn}, acs::A) where {Conn, A<:ACSet}
+function VirtualACSet(conn::FunSQL.SQLConnection{Conn}, acs::ACSet) where Conn
     VirtualACSet{Conn}(conn=conn, schema=acset_schema(acs))
 end
 
@@ -47,6 +80,10 @@ end
 Base.show(io::IOBuffer, v::VirtualACSet) = println(io, "$(v.conn)\n$(v.view)")
 
 # how do we know which view we are looking at?
+
+# Reading data distributed over many data sources. We know how the data
+# should interact.
+
 
 # blends homs and attrs together. not ideal
 function namesrctgt(schema::BasicSchema)
@@ -71,6 +108,10 @@ function toacset(vas::VirtualACSet{Conn}) where Conn
 end
 export toacset
 
+
+
+# ######
+
 function reload! end
 export reload!
 
@@ -78,6 +119,7 @@ function render(vas::VirtualACSet{Conn}, args...; kwargs...) where Conn end
 export render
 
 function execute! end
+export execute!
 
 # TODO generate multiple statements, then decide to execute single or multiple
 function execute!(vas::VirtualACSet{Conn}, stmt::AbstractString; formatter::Union{Nothing, DataType, Function}=DataFrame) where Conn

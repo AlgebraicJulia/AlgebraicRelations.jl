@@ -1,4 +1,3 @@
-using Revise
 using ACSets
 using Catlab
 using Catlab.Graphs
@@ -15,6 +14,9 @@ using MySQL # loads extension
 # TODO how can we make this dynamic
 conn = DBInterface.connect(MySQL.Connection, "localhost", "mysql", db="acsets", 
                     unix_socket="/var/run/mysqld/mysqld.sock")
+
+
+
 
 
 # Let's invoke an ACSet. We can think of an ACSet as a database schema with tables (objects), foreign key constraints (homs), and columns (Attrs) with types (AttrTypes).

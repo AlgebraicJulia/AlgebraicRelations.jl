@@ -14,7 +14,7 @@ function (vas::VirtualACSet)(f::Function, args...; kwargs...)
 end
 
 # get the number of rows
-function ACSetInterface.nparts(vas::VirtualACSet{Conn}, table::Symbol)::DataFrame where Conn
+function ACSetInterface.nparts(vas::VirtualACSet, table::Symbol)
     query = From(table) |> Group() |> Select(Agg.count())
     DBInterface.execute(vas.conn, query) |> DataFrames.DataFrame
 end

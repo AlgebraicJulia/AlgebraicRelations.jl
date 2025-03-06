@@ -1,6 +1,7 @@
 module SQLACSets
 
 using ACSets
+using Catlab
 
 using MLStyle
 using FunSQL
