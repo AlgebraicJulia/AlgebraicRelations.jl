@@ -1,47 +1,12 @@
+using .SQLACSetSyntax
+
 using MLStyle
 using Dates
 using DataFrames
 using FunSQL: reflect
 import FunSQL: render
 
-abstract type AbstractDataSource end
-export AbstractDataSource
-
-struct Database <: AbstractDataSource
-    conn::FunSQL.SQLConnection
-end
-export Database
-
-function Database(conn::Conn) where Conn<:DBInterface.Connection
-    c = FunSQL.DB(conn, catalog=reflect(conn))
-    Database(c)
-end
-
-struct API <: AbstractDataSource end
-export API
-
-struct Vanilla <: AbstractDataSource end
-export Vanilla
-
-# TODO move to Catlab. This is a labeled graph whose edges are also labeled
-@present SchEdgeLabeledGraph <: SchLabeledGraph begin
-    Value::AttrType
-    value::Attr(V, Value)
-    EdgeLabel::AttrType
-    edgelabel::Attr(E, EdgeLabel)
-end
-@acset_type EdgeLabeledGraph(SchEdgeLabeledGraph)
-
-const DataFabric = EdgeLabeledGraph{Symbol, AbstractDataSource, Pair{Symbol, Symbol}}
-export DataFabric
-
 # VAS
-struct Log
-    time::DateTime
-    event
-    Log(event::DataType) = new(Dates.now(), event)
-end
-export Log
 
 struct PagingInfo 
     startIndex::Int
@@ -58,7 +23,6 @@ abstract type AbstractVirtualACSet end
     # the schema is an optional value which mirrors data in the database
     schema::Union{Type{<:ACSet}, Schema, Nothing} = nothing
     view::Union{DataFrames.DataFrame, Nothing} = nothing
-    log::Vector{Log} = Log[]
 end
 export VirtualACSet
 # TODO we need to convert the `view` into an ACSet
@@ -76,8 +40,6 @@ function VirtualACSet(conn::Conn, x::ACSet) where {Conn<:DBInterface.Connection}
     c = FunSQL.DB(conn, catalog=reflect(conn))
     VirtualACSet{Conn}(conn=c, schema=acset_schema(x))
 end
-
-Base.show(io::IOBuffer, v::VirtualACSet) = println(io, "$(v.conn)\n$(v.view)")
 
 # how do we know which view we are looking at?
 
@@ -118,27 +80,27 @@ export reload!
 function render(vas::VirtualACSet{Conn}, args...; kwargs...) where Conn end
 export render
 
-function execute! end
-export execute!
+# function execute! end
+# export execute!
 
-# TODO generate multiple statements, then decide to execute single or multiple
-function execute!(vas::VirtualACSet{Conn}, stmt::AbstractString; formatter::Union{Nothing, DataType, Function}=DataFrame) where Conn
-    result = DBInterface.execute(vas.conn.raw, stmt)
-    isnothing(formatter) && return result
-    formatter(result)
-end
+# # TODO generate multiple statements, then decide to execute single or multiple
+# function execute!(vas::VirtualACSet{Conn}, stmt::AbstractString; formatter::Union{Nothing, DataType, Function}=DataFrame) where Conn
+#     result = DBInterface.execute(vas.conn.raw, stmt)
+#     isnothing(formatter) && return result
+#     formatter(result)
+# end
 
-function execute!(vas::VirtualACSet{Conn}, query::AbstractSQLTerm; formatter::Union{Nothing, DataType, Function}=DataFrame) where Conn
-    result = @match query begin
-        # wants a prepared FunSQL statement
-        ::ACSetInsert || ::ACSetUpdate || ::ACSetDelete || ::ShowTables => DBInterface.execute(vas.conn.raw, render(vas, query)) 
-        _ => DBInterface.execute(vas.conn, render(vas, query))
-    end
-    isnothing(formatter) && return result
-    formatter(result)
-    # check status
-    push!(vas.log, Log(typeof(query)))
-end
+# function execute!(vas::VirtualACSet{Conn}, query::AbstractSQLTerm; formatter::Union{Nothing, DataType, Function}=DataFrame) where Conn
+#     result = @match query begin
+#         # wants a prepared FunSQL statement
+#         ::ACSetInsert || ::ACSetUpdate || ::ACSetDelete || ::ShowTables => DBInterface.execute(vas.conn.raw, render(vas, query)) 
+#         _ => DBInterface.execute(vas.conn, render(vas, query))
+#     end
+#     isnothing(formatter) && return result
+#     formatter(result)
+#     # check status
+#     push!(vas.log, Log(typeof(query)))
+# end
 
 function ACSet!(vas::VirtualACSet{Conn}, query::SQLTerms) where Conn
     vas.view = execute!(vas, query)

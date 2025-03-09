@@ -9,33 +9,33 @@ using FunSQL
 using FunSQL: render, reflect
 using MLStyle
 
-function AlgebraicRelations.reload!(vas::VirtualACSet{SQLite.DB})
+function AlgebraicRelations.reload!(vas::DBSource{SQLite.DB})
     conn = SQLite.DB()
     vas.conn = FunSQL.DB(conn, catalog=reflect(conn))
 end
 
 # DB specific, type conversion
-tosql(::VirtualACSet{SQLite.DB}, ::Type{<:Real}) = "REAL"
-tosql(::VirtualACSet{SQLite.DB}, ::Type{<:AbstractString}) = "TEXT"
-tosql(::VirtualACSet{SQLite.DB}, ::Type{<:Symbol}) = "TEXT"
-tosql(::VirtualACSet{SQLite.DB}, ::Type{<:Integer}) = "INTEGER"
-tosql(::VirtualACSet{SQLite.DB}, T::DataType) = error("$T is not supported in this SQLite implementation")
+tosql(::DBSource{SQLite.DB}, ::Type{<:Real}) = "REAL"
+tosql(::DBSource{SQLite.DB}, ::Type{<:AbstractString}) = "TEXT"
+tosql(::DBSource{SQLite.DB}, ::Type{<:Symbol}) = "TEXT"
+tosql(::DBSource{SQLite.DB}, ::Type{<:Integer}) = "INTEGER"
+tosql(::DBSource{SQLite.DB}, T::DataType) = error("$T is not supported in this SQLite implementation")
 # value conversion
-tosql(::VirtualACSet{SQLite.DB}, ::Nothing) = "NULL"
-tosql(::VirtualACSet{SQLite.DB}, x::T) where T<:Number = x
-tosql(::VirtualACSet{SQLite.DB}, s::Symbol) = string(s)
-tosql(::VirtualACSet{SQLite.DB}, s::String) = "\'$s\'"
-tosql(::VirtualACSet{SQLite.DB}, x) = x
+tosql(::DBSource{SQLite.DB}, ::Nothing) = "NULL"
+tosql(::DBSource{SQLite.DB}, x::T) where T<:Number = x
+tosql(::DBSource{SQLite.DB}, s::Symbol) = string(s)
+tosql(::DBSource{SQLite.DB}, s::String) = "\'$s\'"
+tosql(::DBSource{SQLite.DB}, x) = x
 
 # TODO I don't like that the conversion function is also formatting. 
 # I would be at peace if formatting and value representation were separated
-function tosql(vas::VirtualACSet{SQLite.DB}, v::NamedTuple{T}; key::Bool=true) where T
+function tosql(vas::DBSource{SQLite.DB}, v::NamedTuple{T}; key::Bool=true) where T
     join(collect(Iterators.map(pairs(v)) do (k, v)
                      key ? "$(tosql(vas, k)) = $(tosql(vas, v))" : "$(tosql(vas, v))"
     end), ", ")
 end
 
-function tosql(vas::VirtualACSet{SQLite.DB}, values::Values{T}; key::Bool=true) where T
+function tosql(vas::DBSource{SQLite.DB}, values::Values{T}; key::Bool=true) where T
     if length(values.vals) == 1
         "$(tosql(vas, only(values.vals); key=key))"
     else
@@ -43,16 +43,15 @@ function tosql(vas::VirtualACSet{SQLite.DB}, values::Values{T}; key::Bool=true) 
     end
 end
 
-# String constructors
-export render
 
-function FunSQL.render(vas::VirtualACSet{SQLite.DB}, i::ACSetInsert)
+function FunSQL.render(vas::DBSource{SQLite.DB}, i::ACSetInsert)
     cols = join(columns(i.values), ", ")
     values = join(["($x)" for x ∈ tosql.(Ref(vas), i.values.vals; key=false)], ", ")
     "INSERT IGNORE INTO $(i.table) ($cols) VALUES $values ;"
 end
+export render
 
-function FunSQL.render(vas::VirtualACSet{SQLite.DB}, u::ACSetUpdate) 
+function FunSQL.render(vas::DBSource{SQLite.DB}, u::ACSetUpdate) 
     cols = join(columns(u.values), ", ")
     wheres = !isnothing(u.wheres) ? render(vas, u.wheres) : ""
     @info wheres
@@ -60,7 +59,7 @@ function FunSQL.render(vas::VirtualACSet{SQLite.DB}, u::ACSetUpdate)
 end
 
 # TODO might have to refactor so we can reuse code for show method
-function FunSQL.render(vas::VirtualACSet{SQLite.DB}, s::ACSetSelect)
+function FunSQL.render(vas::DBSource{SQLite.DB}, s::ACSetSelect)
     from = s.from isa Vector ? join(s.from, ", ") : s.from
     qty = render(vas, s.qty)
     join = !isnothing(s.join) ? render(vas, s.join) : " "
@@ -68,26 +67,26 @@ function FunSQL.render(vas::VirtualACSet{SQLite.DB}, s::ACSetSelect)
     "SELECT $qty FROM $from " * join * wheres * ";"
 end
 
-function FunSQL.render(vas::VirtualACSet{SQLite.DB}, j::ACSetJoin)
+function FunSQL.render(vas::DBSource{SQLite.DB}, j::ACSetJoin)
     "$(j.type) JOIN $(j.table) ON $(render(vas, j.on))"
 end
 
-function FunSQL.render(vas::VirtualACSet{SQLite.DB}, ons::Vector{SQLEquation})
+function FunSQL.render(vas::DBSource{SQLite.DB}, ons::Vector{SQLEquation})
     join(render.(Ref(vas), ons), " AND ")
 end
 
-function FunSQL.render(vas::VirtualACSet{SQLite.DB}, eq::SQLEquation)
+function FunSQL.render(vas::DBSource{SQLite.DB}, eq::SQLEquation)
     "$(eq.lhs.first).$(eq.rhs.second) = $(eq.rhs.first).$(eq.rhs.second)"
 end
 
-function FunSQL.render(vas::VirtualACSet{SQLite.DB}, qty::SQLSelectQuantity)
+function FunSQL.render(vas::DBSource{SQLite.DB}, qty::SQLSelectQuantity)
     @match qty begin
         ::SelectAll || ::SelectDistinct || ::SelectDistinctRow => "*"
         SelectColumns(cols) => join(render.(Ref(vas), cols), ", ")
     end
 end
 
-function FunSQL.render(::VirtualACSet{SQLite.DB}, column::Union{Pair{Symbol, Symbol}, Symbol})
+function FunSQL.render(::DBSource{SQLite.DB}, column::Union{Pair{Symbol, Symbol}, Symbol})
     @match column begin
         ::Pair{Symbol, Symbol} => "$(column.first).$(column.second)"
         _ => column
@@ -95,14 +94,14 @@ function FunSQL.render(::VirtualACSet{SQLite.DB}, column::Union{Pair{Symbol, Sym
 end
 
 # TODO
-function FunSQL.render(::VirtualACSet{SQLite.DB}, wheres::WhereClause)
+function FunSQL.render(::DBSource{SQLite.DB}, wheres::WhereClause)
     @match wheres begin
         WhereClause(op, d::Pair) => "WHERE $(d.first) $op ($(join(d.second, ", ")))"
         _ => wheres
     end
 end
 
-function FunSQL.render(vas::VirtualACSet, c::ACSetCreate)
+function FunSQL.render(vas::DBSource, c::ACSetCreate)
     create_stmts = map(objects(c.schema)) do ob
         obattrs = attrs(c.schema; from=ob)
         "CREATE TABLE IF NOT EXISTS $(ob)(" * 
@@ -120,40 +119,40 @@ function FunSQL.render(vas::VirtualACSet, c::ACSetCreate)
     join(create_stmts, " ")
 end
 
-function FunSQL.render(vas::VirtualACSet{SQLite.DB}, d::ACSetDelete)
+function FunSQL.render(vas::DBSource{SQLite.DB}, d::ACSetDelete)
     "DELETE FROM $(d.table) WHERE _id IN ($(join(d.ids, ",")))"
 end
 
-function FunSQL.render(::VirtualACSet{SQLite.DB}, v::Values)
+function FunSQL.render(::DBSource{SQLite.DB}, v::Values)
     "VALUES " * join(entuple(v), ", ") * ";"
 end
 
-function FunSQL.render(::VirtualACSet{SQLite.DB}, a::ACSetAlter)
+function FunSQL.render(::DBSource{SQLite.DB}, a::ACSetAlter)
     "ALTER TABLE $(a.refdom) ADD CONSTRAINT fk_$(ref) FOREIGN KEY ($(a.ref)) REFERENCES $(a.refcodom)(_id); "
 end
 
-function FunSQL.render(::VirtualACSet{SQLite.DB}, ::ShowTables)
+function FunSQL.render(::DBSource{SQLite.DB}, ::ShowTables)
     "SELECT name FROM sqlite_master WHERE type='table';"
 end
 
-function FunSQL.render(::VirtualACSet{SQLite.DB}, fkc::ForeignKeyChecks)
+function FunSQL.render(::DBSource{SQLite.DB}, fkc::ForeignKeyChecks)
     "SET FOREIGN_KEY_CHECKS = $(Int(fkc.bool)) ;"
 end
 
 # convenience
-function AlgebraicRelations.ForeignKeyChecks(vas::VirtualACSet{SQLite.DB}, stmt::String)
+function AlgebraicRelations.ForeignKeyChecks(vas::DBSource{SQLite.DB}, stmt::String)
     l, r = render.(Ref(conn), ForeignKeyChecks.([false, true]))
     wrap(stmt, l, r)
 end
 
 # overloading syntactical constructors 
-function AlgebraicRelations.ACSetInsert(vas::VirtualACSet{SQLite.DB}, acset::ACSet)
+function AlgebraicRelations.ACSetInsert(vas::DBSource{SQLite.DB}, acset::ACSet)
     map(objects(acset_schema(acset))) do ob
         ACSetInsert(vas, acset, ob)
     end
 end
 
-function AlgebraicRelations.ACSetInsert(vas::VirtualACSet{SQLite.DB}, acset::ACSet, table::Symbol)
+function AlgebraicRelations.ACSetInsert(vas::DBSource{SQLite.DB}, acset::ACSet, table::Symbol)
     cols = colnames(acset, table)
     vals = getrows(vas, acset, table)
     ACSetInsert(table, vals, nothing)

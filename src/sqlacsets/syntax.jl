@@ -1,3 +1,8 @@
+module SQLACSetSyntax
+
+using ACSets
+
+using MLStyle
 using DataFrames
 using DBInterface
 using MySQL
@@ -12,6 +17,7 @@ struct Values{T}
     table::Union{Symbol, Nothing}
     vals::Vector{<:NamedTuple{T}}
 end
+export Values
 
 Base.length(v::Values{T}) where T = length(v.vals)
 Base.iterate(v::Values{T}, args...) where T = iterate(v.vals, args...)
@@ -70,6 +76,7 @@ end
 export ACSetJoin
 
 abstract type AbstractSQLTerm end
+export AbstractSQLTerm
 
 @data SQLTerms <: AbstractSQLTerm begin
     ACSetInsert(table::Symbol, values::Values, wheres::Union{WhereClause, Nothing})
@@ -118,3 +125,5 @@ struct ForeignKeyChecks <: DatabaseEnvironmentConfig
     bool::Bool
 end
 export ForeignKeyChecks
+
+end

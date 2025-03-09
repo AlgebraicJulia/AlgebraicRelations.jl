@@ -42,6 +42,8 @@ type2sql(::Type{<:String}) = "TEXT"
 type2sql(s::Symbol) = type2sql("$s")
 type2sql(s::String) = s ∈ keys(TypeToSQL) ? TypeToSQL[s] : "TEXT"
 
+export type2sql
+
 function SQLSchema(p::Presentation; types::Union{Dict, Nothing}=nothing)
     fields = get_fields(p, types)
     sch = SQLSchema{String}()
@@ -137,6 +139,7 @@ function get_fields(sch::Presentation, types::Union{Dict, Nothing})
   end
   fields
 end
+export get_fields
 
 function render_schema(sch::SQLSchema)
   table_gen = map(1:nparts(sch, :Table)) do t

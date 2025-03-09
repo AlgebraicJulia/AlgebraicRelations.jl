@@ -8,9 +8,23 @@ using FunSQL
 using DataFrames
 using DBInterface
 
+using Reexport
+
 # hand-rolled SQL syntax. necessary for DML operations
 include("syntax.jl") 
+
+# defines the Data Fabric concept
+include("Fabric.jl")
+
+# data sources for the Data Fabric
+include("database/Database.jl")
+include("webapi/WebApi.jl")
+
 include("methods.jl") # the VirtualACSet
-include("acsets_interface.jl") # ACSetInterface
+
+@reexport using .SQLACSetSyntax
+@reexport using .Fabric
+@reexport using .Database
+
 
 end
