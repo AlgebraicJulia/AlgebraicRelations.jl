@@ -14,7 +14,7 @@ using Reexport
 include("syntax.jl") 
 
 # defines the Data Fabric concept
-include("Fabric.jl")
+include("fabric/Fabric.jl")
 
 # data sources for the Data Fabric
 include("database/Database.jl")

@@ -7,7 +7,9 @@ using AlgebraicRelations
 # or a "data mesh."
 
 # Data meshes are part of a sequence of paradigms of data management responding
-# to increasing levels of commercial need for interconnectivity.
+# to increasing levels of commercial need for interconnectivity. The simplest
+# example is a "data store." Then we have a "data warehouse," then a "data
+# lake," and then "data meshes" and "data fabrics."
 
 # We can go one step further by defining a "data fabric," a data mesh which
 # implements a virtualization layer for unified access. In commercial
@@ -35,6 +37,7 @@ fabric = DataFabric()
     name::Attr(Student, Name)
 end
 @acset_type Student(SchStudent)
+students = Student{Symbol}()
 
 # ...and their classes...
 @present SchClass(FreeSchema) begin
@@ -43,26 +46,42 @@ end
     subject::Attr(Class, Name)
 end
 @acset_type Class(SchClass)
+classes = Class{Symbol}()
 
-# ...but they are stored in different data sources. We will reconcile them locally with a junction table that has a reference to them, schematized as simply a "Junction" object. Since we are not yet ready to add constraints to both Student and Class, the Junction schema--essentially a table of just references--is very plain.
+# ...but they are stored in different data sources. Let's suppose we have
+# a many-many relationship of students and classes. Here is their membership:
+df = Dict(:Fiona => [:Math, :Philosophy, :Music],
+          :Gregorio => [:Cooking, :Math, :CompSci],
+          :Heather => [:Gym, :Art, :Music, :Math])
+
+# Let's construct an example where the students and class information is stored
+# elsewehere and the membership is currently unknown. We'll add students...
+add_parts!(students, :Student, length(keys(df)), name=keys(df))
+
+# ...and classes...
+add_parts!(classes, :Class, length(union(values(df)...)), 
+           subject=union(values(df)...))
+
+# We will reconcile them locally with a junction table that has a reference to them, schematized as simply a "Junction" object. Since we are not yet ready to add constraints to both Student and Class, the Junction schema--essentially a table of just references--is very plain.
 @present SchSpan(FreeSchema) begin
     Junction::Ob
 end
 @acset_type JunctStudentClass(SchSpan)
 
-# Let's populate the Student and Class tables.
-# ...TODO...
-
 # We'll gradually adapt this example to different kinds of data sources, but
-# for the time being we'll consider both student and class tables are
-# in-memory. 
-add_source!(fabric, InMemory(Student{Symbol}()))
-add_source!(fabric, InMemory(Class{Symbol}()))
+# for the time being we'll consider both student and class tables as
+# in-memory data sources.
+add_source!(fabric, InMemory(students))
+add_source!(fabric, InMemory(classes))
 add_source!(fabric, InMemory(JunctStudentClass()))
 
 add_fk!(fabric, 3, 1, :student => :Student)
 add_fk!(fabric, 3, 2, :class => :Class)
 
-# The DSG describes three data sources with two constraints. Whether the
-# constraints are valid is not yet enforced...they're just something we the
-# users assert. To assure ourselves that this schema makes sense, we should be able to adapt our `join` method from Catlab to recobble the familiar Student-Class junction example. However in many professional applications, it is a fact that data lives in many places.
+# The DSG describes three data sources with two constraints. 
+fabric.graph
+
+# Whether the constraints are valid is not yet enforced...they're just something we the users assert. To assure ourselves that this schema makes sense, we should be able to adapt our `join` method from Catlab to recobble the familiar Student-Class junction example. Because the data fabric presents a unified access layer for data, we'd need a catalog of available schema to find the information we need. In database science, reflection is the ability for databases to store information about their own schema. The fact that information about a database schema can also be represented as a schema is more plainly attributed to the mathematical formalism of schemas as attributed C-Sets. So naturally we implemented `reflect` for the data fabric:
+reflect!(fabric)
+
+# The 

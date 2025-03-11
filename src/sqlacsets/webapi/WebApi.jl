@@ -17,6 +17,6 @@ function Fabric.recatalog!(::WebAPISource) end
 function Fabric.execute!(webapi::WebAPISource, stmt::AbstractString; formatter=nothing)
 end
 
-function ACSetInterface.subpart end
+function ACSetInterface.subpart() end
 
 end

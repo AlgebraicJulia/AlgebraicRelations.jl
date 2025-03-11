@@ -39,67 +39,9 @@ mutable struct InMemory <: AbstractDataSource
 end
 export InMemory
 
-function recatalog!(x::InMemory) end
+Base.:|>(x::InMemory, f) = f(x.value)
 
-# CATALOG
-
-@present SchERD(FreeSchema) begin
-    (Name, Conn)::AttrType
-    (Source, Table, Column, FK)::Ob
-
-    (to, from)::Hom(FK, Column)
-    table::Hom(Column, Table)
-    source::Hom(Table, Source)
-
-    tname::Attr(Table, Name)
-    (type, cname)::Attr(Column, Name)
-    conn::Attr(Source, Conn)
-end
-@abstract_acset_type AbstractSQLSchema
-@acset_type ERD(SchERD) <: AbstractSQLSchema
-
-const Catalog = ERD{Symbol, AbstractDataSource}
-export Catalog
-
-function (c::Catalog)(value)
-    # TODO pointer to object
-    add_part!(c, :Source, conn=Memory(value))
-    c
-end
-
-function add_to_catalog!(catalog::Catalog, p::Presentation; source=nothing, types::Union{Dict, Nothing}=nothing)
-    fields = get_fields(p, types)
-    tables = keys(fields)
-    id = :SERIAL_PRIMARY_KEY # TODO PostgreSQL
-    fk = :INTEGER
-    tab2ind = Dict{Symbol, Int64}()
-    # load tables into their relations
-    source_id = !isnothing(source) ? add_part!(catalog, :Source, conn=source) : 0
-    for t in tables
-        # TODO upstream
-        t_ind = incident(catalog, t, :tname)
-        t_ind = isempty(t_ind) ? add_part!(catalog, :Table, tname=t, source=source_id) : only(t_ind)
-        c_ind = incident(catalog, t_ind, :table)
-        c_ind = isempty(c_ind) ? add_part!(catalog, :Column, table=t_ind, cname=:id, type=id) : only(c_ind)
-      tab2ind[t] = t_ind
-    end
-    #
-    for t in tables
-      for c in fields[t]
-        if c[1] == :Hom
-          col = add_part!(catalog, :Column, table = tab2ind[t], cname = c[3], type=fk)
-          add_part!(catalog, :FK, from=col, to=tab2ind[c[2]])
-        else
-          type = type2sql(c[2])
-          add_part!(catalog, :Column, table = tab2ind[t], cname = c[3], type=Symbol(type))
-        end
-      end
-    end
-    catalog
-end
-export add_to_catalog!
-
-# END OF CATALOG
+include("catalog.jl")
 # Data Source Graph
 
 # TODO move to Catlab. This is a labeled graph whose edges are also labeled
@@ -109,9 +51,9 @@ export add_to_catalog!
     EdgeLabel::AttrType
     edgelabel::Attr(E, EdgeLabel)
 end
-@acset_type EnrichedGraph(SchEnrichedGraph)
+@acset_type DataSourceGraph(SchEnrichedGraph)
 
-const DataSourceGraph = EnrichedGraph{DataType, AbstractDataSource, Pair{Symbol, Symbol}}
+DataSourceGraph() = DataSourceGraph{DataType, AbstractDataSource, Pair{Symbol, Symbol}}()
 export DataSourceGraph
 
 # DataFabric
@@ -143,6 +85,18 @@ function recatalog!(fabric::DataFabric)
     fabric
 end
 
+# TODO don't want copy sources
+# TODO need idempotence
+function reflect!(fabric::DataFabric)
+    foreach(parts(fabric.graph, :V)) do part
+        conn = subpart(fabric.graph, part, :value) 
+        sch = conn |> acset_schema
+        add_to_catalog!(fabric.catalog, Presentation(sch); source=part, conn=typeof(conn))
+    end
+    catalog(fabric)
+end
+export reflect!
+
 # Adding to the Fabric
 
 function add_source!(fabric::DataFabric, source::AbstractDataSource)
@@ -159,6 +113,8 @@ function add_fk!(fabric::DataFabric, src::Int, tgt::Int, elabel::Pair{Symbol, Sy
     add_part!(fabric.graph, :E, src=src, tgt=tgt, edgelabel=elabel)
 end
 export add_fk!
+
+function recatalog!(x::InMemory) end
 
 # Executing commands on data fabric
 
