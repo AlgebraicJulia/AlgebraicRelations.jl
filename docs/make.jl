@@ -41,9 +41,9 @@ makedocs(
   checkdocs=:none,
   pages=Any[
     "AlgebraicRelations.jl"=>"index.md",
-    # "Examples"=>Any[
-    #   "generated/literate_example.md",
-    # ],
+    "Examples"=>Any[
+      "generated/fabric.md",
+    ],
     "Library Reference"=>"api.md",
   ]
 )
@@ -51,6 +51,7 @@ makedocs(
 @info "Deploying docs"
 deploydocs(
   target="build",
+  push_preview=true,
   repo="github.com/AlgebraicJulia/AlgebraicRelations.jl.git",
   branch="gh-pages"
 )

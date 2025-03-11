@@ -16,14 +16,15 @@ using FunSQL: Select, From, Where, Agg, Group, Fun, Get
 using FunSQL: FROM, SELECT, WHERE, FUN
 
 @kwdef mutable struct DBSource{Conn} <: AbstractDataSource
+    schema::BasicSchema
     conn::FunSQL.SQLConnection{Conn}
     log::Vector{Log} = Log[]
 end
 export DBSource
 
-function DBSource(conn::Conn) where Conn
+function DBSource(schema, conn::Conn) where Conn
     funconn = FunSQL.DB(conn, catalog=reflect(conn))
-    DBSource{Conn}(conn=funconn)
+    DBSource{Conn}(schema=schema, conn=funconn)
 end
 
 Fabric.catalog(db::DBSource) = db.conn.catalog
@@ -49,6 +50,8 @@ function Fabric.execute!(db::DBSource, stmt::AbstractSQLTerm; formatter=DataFram
     formatter(result)
 end
 export execute!
+
+DenseACSets.acset_schema(db::DBSource) = db.schema
 
 include("acsets_interface.jl")
 

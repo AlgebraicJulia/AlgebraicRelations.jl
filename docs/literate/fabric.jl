@@ -1,3 +1,5 @@
+# # Data Fabric
+
 using Catlab
 using ACSets
 using AlgebraicRelations
@@ -37,7 +39,7 @@ fabric = DataFabric()
     name::Attr(Student, Name)
 end
 @acset_type Student(SchStudent)
-students = Student{Symbol}()
+students = InMemory(Student{Symbol}())
 
 # ...and their classes...
 @present SchClass(FreeSchema) begin
@@ -48,6 +50,11 @@ end
 @acset_type Class(SchClass)
 classes = Class{Symbol}()
 
+using SQLite, DBInterface
+class_db = DBSource(acset_schema(classes), SQLite.DB())
+
+execute!(class_db, "create table `Class` (_id int, subject varchar(255))")
+
 # ...but they are stored in different data sources. Let's suppose we have
 # a many-many relationship of students and classes. Here is their membership:
 df = Dict(:Fiona => [:Math, :Philosophy, :Music],
@@ -56,11 +63,19 @@ df = Dict(:Fiona => [:Math, :Philosophy, :Music],
 
 # Let's construct an example where the students and class information is stored
 # elsewehere and the membership is currently unknown. We'll add students...
-add_parts!(students, :Student, length(keys(df)), name=keys(df))
+students |> x->add_parts!(x, :Student, length(keys(df)), name=keys(df))
+# TODO implement pass-through method
+
+subpart(students.value, :name)
 
 # ...and classes...
-add_parts!(classes, :Class, length(union(values(df)...)), 
-           subject=union(values(df)...))
+execute!(class_db,
+    """insert or ignore into `class` (_id, subject) values
+    (1, "Math"), (2, "Philosophy"), (3, "Music"),
+    (4, "Cooking"), (5, "CompSci"), (6, "Gym"), (7, "Art"),
+    (8, "Music")
+    """)
+subpart(class_db, :class) # TODO notice how we don't query by column. 
 
 # We will reconcile them locally with a junction table that has a reference to them, schematized as simply a "Junction" object. Since we are not yet ready to add constraints to both Student and Class, the Junction schema--essentially a table of just references--is very plain.
 @present SchSpan(FreeSchema) begin
@@ -71,8 +86,8 @@ end
 # We'll gradually adapt this example to different kinds of data sources, but
 # for the time being we'll consider both student and class tables as
 # in-memory data sources.
-add_source!(fabric, InMemory(students))
-add_source!(fabric, InMemory(classes))
+add_source!(fabric, students)
+add_source!(fabric, class_db)
 add_source!(fabric, InMemory(JunctStudentClass()))
 
 add_fk!(fabric, 3, 1, :student => :Student)
@@ -84,4 +99,9 @@ fabric.graph
 # Whether the constraints are valid is not yet enforced...they're just something we the users assert. To assure ourselves that this schema makes sense, we should be able to adapt our `join` method from Catlab to recobble the familiar Student-Class junction example. Because the data fabric presents a unified access layer for data, we'd need a catalog of available schema to find the information we need. In database science, reflection is the ability for databases to store information about their own schema. The fact that information about a database schema can also be represented as a schema is more plainly attributed to the mathematical formalism of schemas as attributed C-Sets. So naturally we implemented `reflect` for the data fabric:
 reflect!(fabric)
 
-# The 
+# The populated catalog
+fabric.catalog
+
+# `subpart(fabric, :name)` won't work since we haven't defined pass-through
+# methods for "in-memory" databases. Let's query subjects from the data fabric
+subpart(fabric, :subject)

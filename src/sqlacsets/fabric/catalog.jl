@@ -38,7 +38,7 @@ function add_to_catalog!(catalog::Catalog, p::Presentation; source=nothing, conn
         t_ind = incident(catalog, t, :tname)
         t_ind = isempty(t_ind) ? add_part!(catalog, :Table, tname=t, source=source_id) : only(t_ind)
         c_ind = incident(catalog, t_ind, :table)
-        c_ind = isempty(c_ind) ? add_part!(catalog, :Column, table=t_ind, cname=:id, type=id) : only(c_ind)
+        c_ind = isempty(c_ind) ? add_part!(catalog, :Column, table=t_ind, cname=:id, type=id) : c_ind
       tab2ind[t] = t_ind
     end
     #

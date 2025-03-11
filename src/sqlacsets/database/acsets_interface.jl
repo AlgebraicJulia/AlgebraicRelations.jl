@@ -39,8 +39,7 @@ function ACSetInterface.subpart(db::DBSource, key::Int, column::Symbol)
     subpart(db, [key], column)
 end
 
-function ACSetInterface.subpart(db::DBSource, (:), column::Symbol)
-    table = tablefromcolumn(db, column)
+function ACSetInterface.subpart(db::DBSource, (:), column::Symbol; table=nothing)
     query = FROM(table) |> SELECT(column)
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end

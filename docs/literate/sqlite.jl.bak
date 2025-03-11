@@ -12,20 +12,10 @@ using FunSQL: render, SQLDialect
     (val!Salary, Name)::AttrType
     (Employee, Manager, Income, Salary)::Ob
     name::Attr(Employee, Name)
-    #
     (man!employee, man!manager)::Hom(Manager, Employee)
-    #
     inc!employee::Hom(Income, Employee)
     inc!salary::Hom(Income, Salary)
-    #
     sal!salary::Attr(Salary, val!Salary)
 end
 
 busSchema = SQLSchema(Business; types = Dict(:val!Salary => Float64, :Name => String))
-
-vas = VirtualACSet(SQLite.DB())
-splt_stmts = split(render_schema(busSchema), "\n")
-
-for stmt in splt_stmts
-    execute!(vas, stmt)
-end

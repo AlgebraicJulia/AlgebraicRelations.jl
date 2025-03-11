@@ -90,8 +90,9 @@ end
 function reflect!(fabric::DataFabric)
     foreach(parts(fabric.graph, :V)) do part
         conn = subpart(fabric.graph, part, :value) 
-        sch = conn |> acset_schema
-        add_to_catalog!(fabric.catalog, Presentation(sch); source=part, conn=typeof(conn))
+        schema = conn |> acset_schema
+        add_to_catalog!(fabric.catalog, Presentation(schema); 
+                        source=part, conn=typeof(conn))
     end
     catalog(fabric)
 end
@@ -131,10 +132,11 @@ export execute!
 
 # ACSet Interface
 
+# TODO refactor to use graph
 function decide_source(fabric::DataFabric, attr::Pair{Symbol, Tuple{Symbol, Symbol}})
     id = incident(fabric.catalog, attr.second[1], attr.first)
     source_id = subpart(fabric.catalog, only(id), :source)
-    subpart(fabric.catalog, source_id, :conn)
+    subpart(fabric.graph, source_id, :value)
 end
 
 function decide_source(fabric::DataFabric, attr::Pair{Symbol, Symbol})
@@ -145,7 +147,7 @@ function decide_source(fabric::DataFabric, attr::Pair{Symbol, Symbol})
     end
     @assert length(id) == 1
     source_id = subpart(fabric.catalog, id, :source)
-    source = subpart(fabric.catalog, source_id, :conn)
+    source = subpart(fabric.graph, source_id, :value)
     only(source)
 end
 
@@ -161,9 +163,11 @@ function ACSetInterface.maxpart(fabric::DataFabric, table::Symbol)
 end
 export maxpart
 
-function ACSetInterface.subpart(fabric::DataFabric, table::Symbol)
-    source = decide_source(fabric, :tname => table)
-    subpart(source, table)
+function ACSetInterface.subpart(fabric::DataFabric, column::Symbol)
+    source = decide_source(fabric, :cname => column)
+    tableid = subpart(fabric.catalog, incident(fabric.catalog, column, :cname), :table)
+    table = subpart(fabric.catalog, tableid, :tname)
+    subpart(source, :, column; table=only(table))
 end
 export subpart
 
