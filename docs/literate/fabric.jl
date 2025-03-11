@@ -8,10 +8,9 @@ using AlgebraicRelations
 # ACSets, we can connect to form a database schema with multiple data soruces, 
 # or a "data mesh."
 
-# Data meshes are part of a sequence of paradigms of data management responding
-# to increasing levels of commercial need for interconnectivity. The simplest
-# example is a "data store." Then we have a "data warehouse," then a "data
-# lake," and then "data meshes" and "data fabrics."
+# Data meshes are step in a sequence of data management architectures for handling
+# different commericial, industrial, and scientific requirements for data
+# interconnectivity. The simplest paradigm is a "data store," which may be just a single database operating at a central location. Then we have a "data warehouse," then a "data lake," and then "data meshes" and "data fabrics."
 
 # We can go one step further by defining a "data fabric," a data mesh which
 # implements a virtualization layer for unified access. In commercial
@@ -102,6 +101,18 @@ reflect!(fabric)
 # The populated catalog
 fabric.catalog
 
-# `subpart(fabric, :name)` won't work since we haven't defined pass-through
-# methods for "in-memory" databases. Let's query subjects from the data fabric
+# Let's query the names of the students and the available classes. The names of
+# the students are stored in-memory:
+subpart(fabric, :name)
+
+# Meanwhile the available subjects are stored in a SQLite database. We query
+# them as if they were an ACSet.
 subpart(fabric, :subject)
+
+# What are the ID
+incident(fabric, :Philosophy, :subject)
+
+#  
+incident(fabric, :Heather, :name)
+
+

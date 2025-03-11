@@ -19,6 +19,7 @@ include("fabric/Fabric.jl")
 # data sources for the Data Fabric
 include("database/Database.jl")
 include("webapi/WebApi.jl")
+include("inmemory/InMemory.jl")
 
 include("methods.jl") # the VirtualACSet
 

@@ -39,7 +39,12 @@ function ACSetInterface.subpart(db::DBSource, key::Int, column::Symbol)
     subpart(db, [key], column)
 end
 
-function ACSetInterface.subpart(db::DBSource, (:), column::Symbol; table=nothing)
+function ACSetInterface.subpart(db::DBSource, (:), tablecolumn::Pair{Symbol, Symbol})
+    query = FROM(tablecolumn.first) |> SELECT(tablecolumn.second)
+    df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
+end
+
+function ACSetInterface.subpart(db::DBSource, (:), column::Symbol)
     query = FROM(table) |> SELECT(column)
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
@@ -47,19 +52,24 @@ end
 
 # incident
 
-function ACSetInterface.incident(db::DBSource, vals::Vector, tabcol::Tuple{Symbol, Symbol})
-    query = FROM(tabcol[1]) |> WHERE(FUN("in", tabcol[2], vals...)) |> SELECT(:_id)
+function ACSetInterface.incident(db::DBSource, vals::Vector, tablecolumn::Pair{Symbol, Symbol})
+    query = FROM(tablecolumn.first) |> WHERE(FUN(:in, tablecolumn.second, vals...)) |> SELECT(:_id)
+    # query = From(tablecolumn.first) |> Select(:_id) TODO document why this is not permitted
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
+end
+
+function ACSetInterface.incident(db::DBSource, val::Symbol, tablecolumn::Pair{Symbol, Symbol})
+    incident(db, [val], tablecolumn)
 end
 
 # TODO names::Vector{Symbol}
 function ACSetInterface.incident(db::DBSource, vals::Vector, column::Symbol)
     table = tablefromcolumn(db, column)
-    query = FROM(table) |> WHERE(FUN("in", column, vals...)) |> SELECT(:_id)
+    query = From(table) |> Where(Fun.in(Get(column), vals...)) |> Select(:_id)
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
 
-function ACSetInterface.incident(db::DBSource, val, column::Symbol)
+function ACSetInterface.incident(db::DBSource, val::Symbol, column::Symbol)
     incident(db, [val], column)
 end
 

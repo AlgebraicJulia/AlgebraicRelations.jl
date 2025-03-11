@@ -6,7 +6,7 @@ using ...Schemas
 # which implements the ACSet interface. It may "virtualize" data by querying it
 # into memory.
 #
-# Stitching: 
+# ## Colimiting: 
 # If all the data sources have known database schema, then we can assembly the
 # data into a single ACSet schema.
 using Catlab
@@ -79,8 +79,8 @@ export catalog
 catalog(fabric::DataFabric) = fabric.catalog
 
 function recatalog!(fabric::DataFabric)
-    foreach(parts(fabric.catalog, :Source)) do i    
-        fabric.catalog[i, :conn] = recatalog!(subpart(fabric.catalog, i, :conn))
+    foreach(parts(fabric.graph, :V)) do i    
+        fabric.graph[i, :value] = recatalog!(subpart(fabric.graph, i, :value))
     end
     fabric
 end
@@ -140,7 +140,6 @@ function decide_source(fabric::DataFabric, attr::Pair{Symbol, Tuple{Symbol, Symb
 end
 
 function decide_source(fabric::DataFabric, attr::Pair{Symbol, Symbol})
-    #
     id = incident(fabric.catalog, attr.second, attr.first)
     if attr.first == :cname
         id = subpart(fabric.catalog, id, :table)
@@ -166,8 +165,8 @@ export maxpart
 function ACSetInterface.subpart(fabric::DataFabric, column::Symbol)
     source = decide_source(fabric, :cname => column)
     tableid = subpart(fabric.catalog, incident(fabric.catalog, column, :cname), :table)
-    table = subpart(fabric.catalog, tableid, :tname)
-    subpart(source, :, column; table=only(table))
+    table = subpart(fabric.catalog, tableid, :tname) |> only
+    subpart(source, :, table => column)
 end
 export subpart
 
@@ -185,7 +184,9 @@ end
 
 function ACSetInterface.incident(fabric::DataFabric, id, column)
     source = decide_source(fabric, :cname => column)
-    incident(source, id, column)
+    table = subpart(fabric.catalog, subpart(fabric.catalog, incident(fabric.catalog, column, :cname), :table), :tname) |> only
+    table = Symbol(lowercase(string(table)))
+    incident(source, id, table => column)
 end
 export incident
 
