@@ -1,4 +1,4 @@
-module Database
+module DatabaseDS
 
 using ACSets
 using ..SQLACSetSyntax

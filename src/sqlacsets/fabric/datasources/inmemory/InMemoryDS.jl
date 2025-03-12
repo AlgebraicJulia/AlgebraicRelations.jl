@@ -1,11 +1,28 @@
-module InMemory
+module InMemoryDS
 
 using ACSets
 using ..Fabric
 import ..Fabric: recatalog!
 
+# this is an ACSet
+mutable struct InMemory <: AbstractDataSource
+    value
+    function InMemory(value::AbstractDataSource)
+        error("No!")
+    end
+    function InMemory(value)
+        new(value)
+    end
+end
+export InMemory
+
 function recatalog!(m::InMemory); m end
 export recatalog!
+
+function ACSetInterface.add_parts!(m::InMemory, args...; kwargs...)
+    add_parts!(m.value, args...; kwargs...)
+end
+export add_parts!
 
 function ACSetInterface.subpart(m::InMemory, (:), tablecolumn::Pair{Symbol, Symbol})
     result = subpart(m.value, :, tablecolumn.second)

@@ -62,7 +62,7 @@ df = Dict(:Fiona => [:Math, :Philosophy, :Music],
 
 # Let's construct an example where the students and class information is stored
 # elsewehere and the membership is currently unknown. We'll add students...
-students |> x->add_parts!(x, :Student, length(keys(df)), name=keys(df))
+add_parts!(students, :Student, length(keys(df)), name=keys(df))
 # TODO implement pass-through method
 
 subpart(students.value, :name)

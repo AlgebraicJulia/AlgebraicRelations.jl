@@ -1,6 +1,7 @@
 module Fabric
 
 using ...Schemas
+using ..SQLACSetSyntax
 
 # The DataFabric is an edge-labeled graph of data sources and schema-schema interrelations
 # which implements the ACSet interface. It may "virtualize" data by querying it
@@ -26,20 +27,6 @@ export AbstractDataSource
 
 function recatalog! end
 export recatalog!
-
-# this is an ACSet
-mutable struct InMemory <: AbstractDataSource
-    value
-    function InMemory(value::AbstractDataSource)
-        error("No!")
-    end
-    function InMemory(value)
-        new(value)
-    end
-end
-export InMemory
-
-Base.:|>(x::InMemory, f) = f(x.value)
 
 include("catalog.jl")
 # Data Source Graph
@@ -115,8 +102,6 @@ function add_fk!(fabric::DataFabric, src::Int, tgt::Int, elabel::Pair{Symbol, Sy
 end
 export add_fk!
 
-function recatalog!(x::InMemory) end
-
 # Executing commands on data fabric
 
 """ """
@@ -130,69 +115,15 @@ function execute!(fabric::DataFabric, source_id::Int, stmt)
 end
 export execute!
 
-# ACSet Interface
+include("acset_interface.jl")
 
-# TODO refactor to use graph
-function decide_source(fabric::DataFabric, attr::Pair{Symbol, Tuple{Symbol, Symbol}})
-    id = incident(fabric.catalog, attr.second[1], attr.first)
-    source_id = subpart(fabric.catalog, only(id), :source)
-    subpart(fabric.graph, source_id, :value)
-end
+using Reexport
 
-function decide_source(fabric::DataFabric, attr::Pair{Symbol, Symbol})
-    id = incident(fabric.catalog, attr.second, attr.first)
-    if attr.first == :cname
-        id = subpart(fabric.catalog, id, :table)
-    end
-    @assert length(id) == 1
-    source_id = subpart(fabric.catalog, id, :source)
-    source = subpart(fabric.graph, source_id, :value)
-    only(source)
-end
+include("datasources/database/DatabaseDS.jl")
+include("datasources/inmemory/InMemoryDS.jl")
 
-function ACSetInterface.nparts(fabric::DataFabric, table::Symbol)
-    source = decide_source(fabric, :tname => table)
-    nparts(source, table) 
-end
-export nparts
+@reexport using .DatabaseDS
+@reexport using .InMemoryDS
 
-function ACSetInterface.maxpart(fabric::DataFabric, table::Symbol)
-    source = decide_source(fabric, :tname => table)
-    maxpart(source, table)
-end
-export maxpart
-
-function ACSetInterface.subpart(fabric::DataFabric, column::Symbol)
-    source = decide_source(fabric, :cname => column)
-    tableid = subpart(fabric.catalog, incident(fabric.catalog, column, :cname), :table)
-    table = subpart(fabric.catalog, tableid, :tname) |> only
-    subpart(source, :, table => column)
-end
-export subpart
-
-function ACSetInterface.subpart(fabric::DataFabric, id, column::Pair{Symbol, Symbol})
-    # get columns
-    columns = subpart(fabric.catalog, incident(fabric.catalog, column.first, [:table, :tname]), :cname)
-    @assert !isempty(columns[columns .== column.second])
-    source = subpart(fabric.catalog, 
-                     subpart(fabric.catalog, 
-                             incident(fabric.catalog, column.first, :tname),
-                             :source), 
-                     :conn)
-    subpart(only(source), id, column.second)
-end
-
-function ACSetInterface.incident(fabric::DataFabric, id, column)
-    source = decide_source(fabric, :cname => column)
-    table = subpart(fabric.catalog, subpart(fabric.catalog, incident(fabric.catalog, column, :cname), :table), :tname) |> only
-    table = Symbol(lowercase(string(table)))
-    incident(source, id, table => column)
-end
-export incident
-
-function ACSetInterface.incident(fabric::DataFabric, value, tablecol::Tuple{Symbol, Symbol})
-    source = decide_source(fabric, :tname => tablecol)
-    incident(source, value, tablecol[2])
-end
 
 end
