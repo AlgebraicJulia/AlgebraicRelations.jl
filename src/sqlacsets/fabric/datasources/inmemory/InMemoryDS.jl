@@ -1,6 +1,8 @@
 module InMemoryDS
 
 using ACSets
+
+using DataFrames
 using ..Fabric
 import ..Fabric: recatalog!
 
@@ -19,8 +21,13 @@ export InMemory
 function recatalog!(m::InMemory); m end
 export recatalog!
 
-function ACSetInterface.add_parts!(m::InMemory, args...; kwargs...)
-    add_parts!(m.value, args...; kwargs...)
+function DenseACSets.acset_schema(m::InMemory)
+    acset_schema(m.value)
+end
+export acset_schema
+
+function ACSetInterface.add_parts!(m::InMemory, args...)
+    add_parts!(m.value, args...)
 end
 export add_parts!
 

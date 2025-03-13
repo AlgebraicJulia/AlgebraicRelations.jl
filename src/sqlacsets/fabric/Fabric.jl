@@ -77,7 +77,7 @@ end
 function reflect!(fabric::DataFabric)
     foreach(parts(fabric.graph, :V)) do part
         conn = subpart(fabric.graph, part, :value) 
-        schema = conn |> acset_schema
+        schema = acset_schema(conn)
         add_to_catalog!(fabric.catalog, Presentation(schema); 
                         source=part, conn=typeof(conn))
     end
