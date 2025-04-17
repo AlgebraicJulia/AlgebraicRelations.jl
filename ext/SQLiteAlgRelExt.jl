@@ -9,9 +9,9 @@ using FunSQL
 using FunSQL: render, reflect
 using MLStyle
 
-function AlgebraicRelations.reload!(vas::DBSource{SQLite.DB})
+function AlgebraicRelations.reload!(source::DBSource{SQLite.DB})
     conn = SQLite.DB()
-    vas.conn = FunSQL.DB(conn, catalog=reflect(conn))
+    source.conn = FunSQL.DB(conn, catalog=reflect(conn))
 end
 
 # DB specific, type conversion
@@ -29,60 +29,62 @@ tosql(::DBSource{SQLite.DB}, x) = x
 
 # TODO I don't like that the conversion function is also formatting. 
 # I would be at peace if formatting and value representation were separated
-function tosql(vas::DBSource{SQLite.DB}, v::NamedTuple{T}; key::Bool=true) where T
+function tosql(source::DBSource{SQLite.DB}, v::NamedTuple{T}; key::Bool=true) where T
     join(collect(Iterators.map(pairs(v)) do (k, v)
-                     key ? "$(tosql(vas, k)) = $(tosql(vas, v))" : "$(tosql(vas, v))"
+                     key ? "$(tosql(source, k)) = $(tosql(source, v))" : "$(tosql(source, v))"
     end), ", ")
 end
 
-function tosql(vas::DBSource{SQLite.DB}, values::Values{T}; key::Bool=true) where T
+function tosql(source::DBSource{SQLite.DB}, values::Values{T}; key::Bool=true) where T
     if length(values.vals) == 1
-        "$(tosql(vas, only(values.vals); key=key))"
+        "$(tosql(source, only(values.vals); key=key))"
     else
-        join(["($x)" for x ∈ tosql.(Ref(vas), values.vals; key=key)], ", ")
+        join(["($x)" for x ∈ tosql.(Ref(source), values.vals; key=key)], ", ")
     end
 end
 
 
-function FunSQL.render(vas::DBSource{SQLite.DB}, i::ACSetInsert)
+# Render functions convert our intermediate syntax (ACSetInsert, etc.) into
+# strings in the target DB dialect.
+
+function FunSQL.render(source::DBSource{SQLite.DB}, i::ACSetInsert)
     cols = join(columns(i.values), ", ")
-    values = join(["($x)" for x ∈ tosql.(Ref(vas), i.values.vals; key=false)], ", ")
+    values = join(["($x)" for x ∈ tosql.(Ref(source), i.values.vals; key=false)], ", ")
     "INSERT IGNORE INTO $(i.table) ($cols) VALUES $values ;"
 end
 export render
 
-function FunSQL.render(vas::DBSource{SQLite.DB}, u::ACSetUpdate) 
+function FunSQL.render(source::DBSource{SQLite.DB}, u::ACSetUpdate) 
     cols = join(columns(u.values), ", ")
-    wheres = !isnothing(u.wheres) ? render(vas, u.wheres) : ""
-    @info wheres
-    "UPDATE $(u.table) SET $(tosql(vas, u.values)) " * wheres * ";"
+    wheres = !isnothing(u.wheres) ? render(source, u.wheres) : ""
+    "UPDATE $(u.table) SET $(tosql(source, u.values)) " * wheres * ";"
 end
 
 # TODO might have to refactor so we can reuse code for show method
-function FunSQL.render(vas::DBSource{SQLite.DB}, s::ACSetSelect)
+function FunSQL.render(source::DBSource{SQLite.DB}, s::ACSetSelect)
     from = s.from isa Vector ? join(s.from, ", ") : s.from
-    qty = render(vas, s.qty)
-    join = !isnothing(s.join) ? render(vas, s.join) : " "
-    wheres = !isnothing(s.wheres) ? render(vas, s.wheres) : ""
+    qty = render(source, s.qty)
+    join = !isnothing(s.join) ? render(source, s.join) : " "
+    wheres = !isnothing(s.wheres) ? render(source, s.wheres) : ""
     "SELECT $qty FROM $from " * join * wheres * ";"
 end
 
-function FunSQL.render(vas::DBSource{SQLite.DB}, j::ACSetJoin)
-    "$(j.type) JOIN $(j.table) ON $(render(vas, j.on))"
+function FunSQL.render(source::DBSource{SQLite.DB}, j::ACSetJoin)
+    "$(j.type) JOIN $(j.table) ON $(render(source, j.on))"
 end
 
-function FunSQL.render(vas::DBSource{SQLite.DB}, ons::Vector{SQLEquation})
-    join(render.(Ref(vas), ons), " AND ")
+function FunSQL.render(source::DBSource{SQLite.DB}, ons::Vector{SQLEquation})
+    join(render.(Ref(source), ons), " AND ")
 end
 
-function FunSQL.render(vas::DBSource{SQLite.DB}, eq::SQLEquation)
+function FunSQL.render(source::DBSource{SQLite.DB}, eq::SQLEquation)
     "$(eq.lhs.first).$(eq.rhs.second) = $(eq.rhs.first).$(eq.rhs.second)"
 end
 
-function FunSQL.render(vas::DBSource{SQLite.DB}, qty::SQLSelectQuantity)
+function FunSQL.render(source::DBSource{SQLite.DB}, qty::SQLSelectQuantity)
     @match qty begin
         ::SelectAll || ::SelectDistinct || ::SelectDistinctRow => "*"
-        SelectColumns(cols) => join(render.(Ref(vas), cols), ", ")
+        SelectColumns(cols) => join(render.(Ref(source), cols), ", ")
     end
 end
 
@@ -101,25 +103,25 @@ function FunSQL.render(::DBSource{SQLite.DB}, wheres::WhereClause)
     end
 end
 
-function FunSQL.render(vas::DBSource, c::ACSetCreate)
+function FunSQL.render(source::DBSource, c::ACSetCreate)
     create_stmts = map(objects(c.schema)) do ob
         obattrs = attrs(c.schema; from=ob)
         "CREATE TABLE IF NOT EXISTS $(ob)(" * 
             join(filter(!isempty, ["_id INTEGER PRIMARY KEY",
                 # column_name column_type
                 join(map(homs(c.schema; from=ob)) do (col, src, tgt)
-                       tgttype = tosql(vas, Int)
+                       tgttype = tosql(source, Int)
                        "$(col) $tgttype"
                 end, ", "),
                 join(map(obattrs) do (col, _, type)
                     # FIXME
-                    "$(col) $(tosql(vas, subpart_type(vas.acsettype(), type)))" 
+                    "$(col) $(tosql(source, subpart_type(source.acsettype(), type)))" 
                end, ", ")]), ", ") * ");"
     end
     join(create_stmts, " ")
 end
 
-function FunSQL.render(vas::DBSource{SQLite.DB}, d::ACSetDelete)
+function FunSQL.render(source::DBSource{SQLite.DB}, d::ACSetDelete)
     "DELETE FROM $(d.table) WHERE _id IN ($(join(d.ids, ",")))"
 end
 
@@ -140,27 +142,28 @@ function FunSQL.render(::DBSource{SQLite.DB}, fkc::ForeignKeyChecks)
 end
 
 # convenience
-function AlgebraicRelations.ForeignKeyChecks(vas::DBSource{SQLite.DB}, stmt::String)
+function AlgebraicRelations.ForeignKeyChecks(source::DBSource{SQLite.DB}, stmt::String)
     l, r = render.(Ref(conn), ForeignKeyChecks.([false, true]))
     wrap(stmt, l, r)
 end
 
 # overloading syntactical constructors 
-function AlgebraicRelations.ACSetInsert(vas::DBSource{SQLite.DB}, acset::ACSet)
+function AlgebraicRelations.ACSetInsert(source::DBSource{SQLite.DB}, acset::ACSet)
     map(objects(acset_schema(acset))) do ob
-        ACSetInsert(vas, acset, ob)
+        ACSetInsert(source, acset, ob)
     end
 end
 
-function AlgebraicRelations.ACSetInsert(vas::DBSource{SQLite.DB}, acset::ACSet, table::Symbol)
+function AlgebraicRelations.ACSetInsert(source::DBSource{SQLite.DB}, acset::ACSet, table::Symbol)
     cols = colnames(acset, table)
-    vals = getrows(vas, acset, table)
+    vals = getrows(source, acset, table)
     ACSetInsert(table, vals, nothing)
 end
 
+"""
 
-
-#####
+This constructs a SQLSchema
+"""
 function AlgebraicRelations.SQLSchema(db::SQLite.DB)
   sch = SQLSchema()
   tables = [t.name for t in SQLite.tables(db)]

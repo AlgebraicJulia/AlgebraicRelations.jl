@@ -42,14 +42,15 @@ new_catalog = fundb.catalog
 
 # OurSQL
 
-# Let's define a data source for it. We automatically wrap a FunSQL.DB over it.
-db = DBSource(SQLite.DB())
+# Let's define a data source for it. We don't know the schema inside it.
+# TODO this runs but we need to add the names of schema, not the table info
+db = DBSource(SQLite.DB(), busSchema)
 
 # we have our own `execute!` 
 for stmt in split_stmts
     execute!(db, stmt)
 end
-recatalog!(db)
+# recatalog!(db) # TODO why?
 
 # ...
 execute!(db, ShowTables())
@@ -57,27 +58,29 @@ execute!(db, ShowTables())
 # data fabric
 fabric = DataFabric()
 
-busSchema = add_to_catalog!(fabric.catalog, Business;
-    source=db, types = Dict(:val!Salary => Float64, :Name => String))
+db_id = add_source!(fabric, db)
+
+reflect!(fabric)
+
 # splt_stmts = split(render_schema(busSchema), "\n")
 
 insert_stmts = [
-    "INSERT OR IGNORE INTO employee (name, id)   VALUES ('Bob', 1);",
-    "INSERT OR IGNORE INTO employee (name, id)   VALUES ('Alice', 2);",
-    "INSERT OR IGNORE INTO employee (name, id)   VALUES ('Charlie', 3);",
-    "INSERT OR IGNORE INTO employee (name, id)   VALUES ('Eve', 4);",
-    "INSERT OR IGNORE INTO manager  (employee, manager, id)    VALUES (1, 1, 1);",
-    "INSERT OR IGNORE INTO manager  (employee, manager, id)    VALUES (2, 1, 2);",
-    "INSERT OR IGNORE INTO manager  (employee, manager, id)    VALUES (3, 4, 3);",
-    "INSERT OR IGNORE INTO manager  (employee, manager, id)    VALUES (4, 1, 4);",
-    "INSERT OR IGNORE INTO salary   (salary, id)    VALUES (50000, 1);",
-    "INSERT OR IGNORE INTO salary   (salary, id)    VALUES (150000, 2);",
-    "INSERT OR IGNORE INTO salary   (salary, id)    VALUES (80000, 3);",
-    "INSERT OR IGNORE INTO salary   (salary, id)    VALUES (90000, 4);",
-    "INSERT OR IGNORE INTO income   (employee, salary, id)    VALUES (1, 1, 1);",
-    "INSERT OR IGNORE INTO income   (employee, salary, id)    VALUES (2, 2, 2);",
-    "INSERT OR IGNORE INTO income   (employee, salary, id)    VALUES (3, 3, 3);",
-    "INSERT OR IGNORE INTO income   (employee, salary, id)    VALUES (4, 4, 4);"];
+    "INSERT OR IGNORE INTO Employee (name, id)   VALUES ('Bob', 1);",
+    "INSERT OR IGNORE INTO Employee (name, id)   VALUES ('Alice', 2);",
+    "INSERT OR IGNORE INTO Employee (name, id)   VALUES ('Charlie', 3);",
+    "INSERT OR IGNORE INTO Employee (name, id)   VALUES ('Eve', 4);",
+    "INSERT OR IGNORE INTO Manager  (employee, manager, id)    VALUES (1, 1, 1);",
+    "INSERT OR IGNORE INTO Manager  (employee, manager, id)    VALUES (2, 1, 2);",
+    "INSERT OR IGNORE INTO Manager  (employee, manager, id)    VALUES (3, 4, 3);",
+    "INSERT OR IGNORE INTO Manager  (employee, manager, id)    VALUES (4, 1, 4);",
+    "INSERT OR IGNORE INTO Salary   (salary, id)    VALUES (50000, 1);",
+    "INSERT OR IGNORE INTO Salary   (salary, id)    VALUES (150000, 2);",
+    "INSERT OR IGNORE INTO Salary   (salary, id)    VALUES (80000, 3);",
+    "INSERT OR IGNORE INTO Salary   (salary, id)    VALUES (90000, 4);",
+    "INSERT OR IGNORE INTO Income   (employee, salary, id)    VALUES (1, 1, 1);",
+    "INSERT OR IGNORE INTO Income   (employee, salary, id)    VALUES (2, 2, 2);",
+    "INSERT OR IGNORE INTO Income   (employee, salary, id)    VALUES (3, 3, 3);",
+    "INSERT OR IGNORE INTO Income   (employee, salary, id)    VALUES (4, 4, 4);"];
 for stmt in insert_stmts
     execute!(db, stmt)
 end

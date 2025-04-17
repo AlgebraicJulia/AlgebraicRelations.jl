@@ -1,5 +1,6 @@
 module Schemas
 
+using Catlab
 using Catlab.CategoricalAlgebra
 using FunSQL: SQLTable
 

@@ -1,5 +1,3 @@
-# get == select == subpart
-#
 module WebAPIDS
 
 using ..Fabric
@@ -17,14 +15,6 @@ export WebAPISource
 # objects are endpoints
 # attrs are query params
 
-const axolt = "https://theaxolotlapi.netlify.app/"
-
-resp = HTTP.request("GET", axolt)
-resp = HTTP.get(axolt)
-println(resp.status)
-println(String(resp.body))
-
-resp = HTTP.get("http://httpbin.org/anything"; query=["hello" => "world"])
 # TODO convert FunSQL into Query Parameters
 
 function Fabric.recatalog!(::WebAPI) end
@@ -39,7 +29,7 @@ end
 function ACSetInterface.incident(web::WebAPI, id, column::Symbol)
 end
 
-# HTTP.get(...) # select
+# HTTP.get(...) # select # subpart
 # HTTP.post(...) # insert
 # HTTP.put(...) # upsert
 # HTTP.delete(...)

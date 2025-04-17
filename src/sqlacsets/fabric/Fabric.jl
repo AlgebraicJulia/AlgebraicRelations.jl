@@ -65,6 +65,8 @@ export catalog
 
 catalog(fabric::DataFabric) = fabric.catalog
 
+"""
+"""
 function recatalog!(fabric::DataFabric)
     foreach(parts(fabric.graph, :V)) do i    
         fabric.graph[i, :value] = recatalog!(subpart(fabric.graph, i, :value))
@@ -75,11 +77,10 @@ end
 # TODO don't want copy sources
 # TODO need idempotence
 function reflect!(fabric::DataFabric)
-    foreach(parts(fabric.graph, :V)) do part
-        conn = subpart(fabric.graph, part, :value) 
+    foreach(parts(fabric.graph, :V)) do source_id
+        conn = subpart(fabric.graph, source_id, :value)
         schema = acset_schema(conn)
-        add_to_catalog!(fabric.catalog, Presentation(schema); 
-                        source=part, conn=typeof(conn))
+        add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(conn))
     end
     catalog(fabric)
 end
@@ -88,7 +89,7 @@ export reflect!
 # Adding to the Fabric
 
 function add_source!(fabric::DataFabric, source::AbstractDataSource)
-    source_id = add_part!(fabric.graph, :V, value=source)
+    add_part!(fabric.graph, :V, value=source)
 end
 export add_source!
 

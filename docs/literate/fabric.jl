@@ -1,11 +1,10 @@
 # # Data Fabric
-
 using Catlab
 using ACSets
 using AlgebraicRelations
 # SQLACSets are data sources which implement the ACSet interface. The trivial
 # example of this case is the ACSet, which is an in-memory database. Using
-# ACSets, we can connect to form a database schema with multiple data soruces, 
+# ACSets, we can connect to form a database schema with multiple data sources, 
 # or a "data mesh."
 
 # Data meshes are step in a sequence of data management architectures for handling
@@ -78,6 +77,7 @@ subpart(class_db, :class) # TODO notice how we don't query by column.
 
 # We will reconcile them locally with a junction table that has a reference to them, schematized as simply a "Junction" object. Since we are not yet ready to add constraints to both Student and Class, the Junction schema--essentially a table of just references--is very plain.
 @present SchSpan(FreeSchema) begin
+    Id::AttrType
     Junction::Ob
 end
 @acset_type JunctStudentClass(SchSpan)
@@ -87,7 +87,7 @@ end
 # in-memory data sources.
 add_source!(fabric, students)
 add_source!(fabric, class_db)
-add_source!(fabric, InMemory(JunctStudentClass()))
+add_source!(fabric, InMemory(JunctStudentClass{Int}()))
 
 add_fk!(fabric, 3, 1, :student => :Student)
 add_fk!(fabric, 3, 2, :class => :Class)

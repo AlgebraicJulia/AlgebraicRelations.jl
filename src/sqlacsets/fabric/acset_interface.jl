@@ -9,9 +9,11 @@ end
 
 function decide_source(fabric::DataFabric, attr::Pair{Symbol, Symbol})
     id = incident(fabric.catalog, attr.second, attr.first)
+    @info attr
     if attr.first == :cname
         id = subpart(fabric.catalog, id, :table)
     end
+    @info id
     @assert length(id) == 1
     source_id = subpart(fabric.catalog, id, :source)
     source = subpart(fabric.graph, source_id, :value)
