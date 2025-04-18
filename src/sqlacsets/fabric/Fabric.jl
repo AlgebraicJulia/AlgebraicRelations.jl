@@ -70,9 +70,12 @@ export DataSourceGraph
 struct Log
     time::DateTime
     event
-    Log(event::DataType) = new(Dates.now(), event)
 end
 export Log
+
+function Log(event::DataType)
+    Log(Dates.now(), event)
+end
 
 @kwdef mutable struct DataFabric
     # this will store the connections, their schema, and values
