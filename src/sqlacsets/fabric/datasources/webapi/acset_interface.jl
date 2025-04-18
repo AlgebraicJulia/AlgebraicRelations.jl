@@ -1,6 +1,7 @@
 using ACSets
 
 using MLStyle
+using Dates
 
 struct Accessors
     accessors
@@ -46,16 +47,17 @@ end
 
 # its generally better to explicitly format the return value of the query, such as piping it through split+JSON3.read, but it may also be the case that we want a general format for how return data should be cached. 
 #
-function ACSetInterface.subpart(web::WebAPI, kws...; path::String="", formatter=identity)
+# function ACSetInterface.subpart(web::WebAPI, kws...; path::String="", formatter=identity)
+function ACSetInterface.subpart(web::WebAPI, name::Symbol; formatter=identity)
     headers = build_headers(web)
-    response = HTTP.request("GET", web.conn, headers, kws...)
+    push!(web.log, Log(Dates.now(), "Called $(web.conn.endpoint) for $name"))
+    response = isnothing(headers) ? HTTP.request("GET", web.conn.endpoint) : HTTP.request("GET", web.conn.endpoint, headers)
     @assert response.status == 200
     parsed_doc = parsehtml(String(response.body))
-    query(parsed_doc, path) |> formatter
+    query(parsed_doc, web.paths[name]) |> formatter
 end
 
 function ACSetInterface.incident(web::WebAPI, id, column::Union{Symbol, Nothing}=nothing)
-    
 end
 
 # HTTP.get(...) # select # subpart

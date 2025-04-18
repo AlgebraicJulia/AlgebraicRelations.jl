@@ -132,9 +132,12 @@ export QueryResultWrapper
 struct Log
     time::DateTime
     event
-    Log(event::DataType) = new(Dates.now(), event)
 end
 export Log
+
+function Log(event::DataType)
+    Log(Dates.now(), event)
+end
 
 using TraitInterfaces
 import Catlab: ACSet
