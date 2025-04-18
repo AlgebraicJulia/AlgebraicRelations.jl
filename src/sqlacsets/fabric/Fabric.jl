@@ -78,8 +78,9 @@ end
 # TODO need idempotence
 function reflect!(fabric::DataFabric)
     foreach(parts(fabric.graph, :V)) do source_id
-        conn = subpart(fabric.graph, source_id, :value)
-        schema = acset_schema(conn)
+        source = subpart(fabric.graph, source_id, :value)
+        schema = acset_schema(source)
+        @info source
         add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(conn))
     end
     catalog(fabric)

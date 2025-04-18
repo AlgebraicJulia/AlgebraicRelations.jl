@@ -14,17 +14,57 @@ using DataFrames
   (val!Salary, Name)::AttrType
   (Employee, Manager, Income, Salary)::Ob
   name::Attr(Employee, Name)
-  #
   (man!employee, man!manager)::Hom(Manager, Employee)
-  #
   inc!employee::Hom(Income, Employee)
   inc!salary::Hom(Income, Salary)
-  #
   sal!salary::Attr(Salary, val!Salary)
 end
 
 # this is just for the purposes of creating tables
 busSchema = SQLSchema(Business; types = Dict(:val!Salary => Float64, :Name => String))
+
+# SQLSchema to ACSet
+function ACSet(p::Presentation{ThDoubleSchema.Meta.T, Symbol})
+    # construct ACSet presentation
+    out = Presentation(FreeSchema)
+    # add AttrType
+    attrtypes = map(generators(p, :AttrType)) do attrtype
+        add_generator!(out, AttrType(FreeSchema.AttrType, Symbol(attrtype)))
+    end
+    # add Obs
+    map(generators(p, :Ob)) do ob
+        add_generator!(out, Ob(FreeSchema.Ob, Symbol(ob)))
+    end
+    # add AttrVals
+    map(generators(p, :Attr)) do attr
+        add_generator!(out, Attr(Symbol(attr), [out[Symbol(t)] for t in attr.type_args]...))
+    end
+    # convert proarrows to homs
+    map(generators(p, :Pro)) do pro
+        ob = Ob(FreeSchema.Ob, first(pro))
+        add_generator!(out, ob)
+        map(pro.type_args) do hom
+            name = Symbol(lowercase(string(only(hom.args)))) # XXX assumes the names are not yet taken
+            add_generator!(out, Hom(name, ob, out[only(hom.args)]))
+        end
+    end
+    out
+end
+
+function ACSet(s::SQLSchema)
+    out = Presentation(FreeSchema)
+    foreach(s[:, :tname]) do table
+        add_generator!(out, Ob(FreeSchema.Ob, Symbol(table)))
+    end
+    foreach(parts(s, :FK)) do fk
+        to, from = Ob.(Ref(FreeSchema), subpart.(Ref(s), Ref(fk), [:to, :from])) 
+        add_generator!(out, Hom(gensym(), from, to))
+    end
+    out
+end
+
+
+
 split_stmts = split(render_schema(busSchema), "\n")
 
 # let's start by understanding the FunSQL interface.
