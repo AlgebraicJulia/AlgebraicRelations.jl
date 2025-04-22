@@ -21,6 +21,8 @@ using FunSQL
 using FunSQL: reflect
 import FunSQL: render
 
+using Reexport
+
 # DATA SOURCES
 abstract type AbstractDataSource end
 export AbstractDataSource
@@ -79,9 +81,23 @@ end
 function reflect!(fabric::DataFabric)
     foreach(parts(fabric.graph, :V)) do source_id
         source = subpart(fabric.graph, source_id, :value)
-        schema = acset_schema(source)
-        @info source
-        add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(conn))
+        schema = SQLSchema(Presentation(acset_schema(source)))
+        add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(source))
+    end
+    # TODO improve this
+    foreach(parts(fabric.graph, :E)) do edge_id
+        src, tgt, edgelabel = subpart.(Ref(fabric.graph), edge_id, [:src, :tgt, :edgelabel])
+        # gets table associated to source
+        fromtable, fromcol = split("$(edgelabel.first)", "!")
+        totable, tocol = split("$(edgelabel.second)", "!")
+        from = only(incident(fabric.catalog, Symbol(fromcol), :cname))
+        to = only(incident(fabric.catalog, Symbol(tocol), :cname))
+        # check if it should be added
+        check1 = incident(fabric.catalog, to, :to)
+        check2 = incident(fabric.catalog, from, :from)
+        if check1 == [] && check2 == []
+            add_part!(fabric.catalog, :FK, to=to, from=from)
+        end
     end
     catalog(fabric)
 end
@@ -118,8 +134,6 @@ end
 export execute!
 
 include("acset_interface.jl")
-
-using Reexport
 
 include("datasources/database/DatabaseDS.jl")
 include("datasources/inmemory/InMemoryDS.jl")

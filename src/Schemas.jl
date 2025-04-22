@@ -42,7 +42,6 @@ type2sql(::Type{<:Matrix{<:Int}}) = "INTEGER[][]"
 type2sql(::Type{<:String}) = "TEXT"
 type2sql(s::Symbol) = type2sql("$s")
 type2sql(s::String) = s ∈ keys(TypeToSQL) ? TypeToSQL[s] : "TEXT"
-
 export type2sql
 
 function SQLSchema(p::Presentation; types::Union{Dict, Nothing}=nothing)
@@ -55,18 +54,20 @@ function SQLSchema(p::Presentation; types::Union{Dict, Nothing}=nothing)
     # load tables into their relations
     for t in tables
       t_ind = add_part!(sch, :Table, tname="$t")
-      add_part!(sch, :Column, table=t_ind, cname="id", type=id)
+      add_part!(sch, :Column, table=t_ind, cname="$(t)_id", type=id)
       tab2ind[t] = t_ind
     end
     #
     for t in tables
-      for c in fields[t]
+        t_ind = only(incident(sch, "$t", :tname))
+        for c in fields[t]
         if c[1] == :Hom
-          col = add_part!(sch, :Column, table = tab2ind[t], cname = "$(c[3])", type=fk)
-          add_part!(sch, :FK, from=col, to=tab2ind[c[2]])
+          col = add_part!(sch, :Column, table = t_ind, cname = "$(c[3])", type=fk)
+          # TODO switched
+          add_part!(sch, :FK, to=col, from=tab2ind[c[2]])
         else
           type = type2sql(c[2])
-          add_part!(sch, :Column, table = tab2ind[t], cname = "$(c[3])", type=type)
+          add_part!(sch, :Column, table = t_ind, cname = "$(c[3])", type=type)
         end
       end
     end
@@ -74,7 +75,6 @@ function SQLSchema(p::Presentation; types::Union{Dict, Nothing}=nothing)
 end
 
 SQLSchema(args...) = SQLSchema{String}()
-
 
 # XXX
 # Targets of foreign keys are not included in the final ACSet
@@ -146,7 +146,7 @@ export get_fields
 function render_schema(sch::SQLSchema)
   table_gen = map(1:nparts(sch, :Table)) do t
       cols = incident(sch, t, :table)
-      filter!(c -> isempty(incident(sch, c, :from)), cols)
+      # filter!(c -> isempty(incident(sch, c, :from)), cols)
       col_gen = ["$(sch[c, :cname]) $(sch[c, :type])" for c in cols]
       "CREATE TABLE IF NOT EXISTS $(sch[t, :tname])($(join(col_gen, ", ")))"
   end
@@ -156,21 +156,22 @@ function render_schema(sch::SQLSchema)
     to_col = sch[fk, :to]
     to_tab = sch[to_col, :table]
     # TODO have Alter Table method that dispatches on connection
-    join(("ALTER TABLE $(sch[from_tab, :tname])",
-          "ADD COLUMN $(sch[from_col, :cname]) INTEGER",
-          "REFERENCES $(sch[to_tab, :tname])($(sch[to_col, :cname]))"), " ")
+    join(("ALTER TABLE $(sch[to_tab, :tname])",
+          "ADD COLUMN $(lowercase(sch[from_tab, :tname]))_$(sch[to_tab, :cname]) INTEGER",
+          "REFERENCES $(sch[from_tab, :tname])($(sch[from_tab, :cname]))"), " ")
   end
   "$(join(vcat(table_gen, fk_gen), ";\n"));"
 end
 
 
 function load_schema(filename::String)
-  load_schema(JSON.parsefile(filename))
+    load_schema(JSON.parsefile(filename))
 end
+
 function load_schema(dict::Dict)
-  Dict{Symbol, Union{SQLTable, SQLNode}}(map(collect(keys(dict))) do k
-    Symbol(k) => SQLTable(Symbol(k), columns = Symbol.(dict[k]))
-  end)
+    Dict{Symbol, Union{SQLTable, SQLNode}}(map(collect(keys(dict))) do k
+        Symbol(k) => SQLTable(Symbol(k), columns = Symbol.(dict[k]))
+    end)
 end
 
 end

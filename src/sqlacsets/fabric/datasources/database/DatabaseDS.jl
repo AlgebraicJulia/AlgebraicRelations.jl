@@ -16,7 +16,7 @@ using FunSQL: Select, From, Where, Agg, Group, Fun, Get
 using FunSQL: FROM, SELECT, WHERE, FUN
 
 @kwdef mutable struct DBSource{Conn} <: AbstractDataSource
-    schema::Union{<:ACSet, Nothing} = nothing
+    schema::Union{<:BasicSchema, Nothing} = nothing
     conn::FunSQL.SQLConnection{Conn}
     log::Vector{Log} = Log[]
 end

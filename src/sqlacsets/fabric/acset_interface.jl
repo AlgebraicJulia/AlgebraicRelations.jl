@@ -31,6 +31,11 @@ end
 export maxpart
 
 function ACSetInterface.subpart(fabric::DataFabric, column::Symbol)
+    column = if isempty(incident(fabric.catalog, column, :tname))
+        column
+    else
+        Symbol("$(column)_id")
+    end
     source = decide_source(fabric, :cname => column)
     tableid = subpart(fabric.catalog, incident(fabric.catalog, column, :cname), :table)
     table = subpart(fabric.catalog, tableid, :tname) |> only
