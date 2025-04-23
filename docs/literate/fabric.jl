@@ -2,21 +2,10 @@
 using Catlab
 using ACSets
 using AlgebraicRelations
-# SQLACSets are data sources which implement the ACSet interface. The trivial
-# example of this case is the ACSet, which is an in-memory database. Using
-# ACSets, we can connect to form a database schema with multiple data sources, 
-# or a "data mesh."
+# "SQLACSets" refers to data sources, specifically relational databases, which implement the ACSet interface. The trivial
+# example of this case is the ACSet, which is an in-memory database. However, we can also implement the ACSet interface for a SQLite connection. Since anything can implement the ACSet interface, we're interested in a structure which can dispatch ACSet methods over the right datasource. This distributed architecture is a valuable practice in enterprise database administration for unifying data which might be maintained by their product owner and accessed through microservices. It provides a unified access protocol and a virtualization layer where data from data sources are cached for quicker retrieval. An object which catalogs where data resides makes its retrieval and collation easier to specify, maintain, and, by cacheing data in memory, faster. This "data fabric" is business jargon, but satisfactorily evokes a feeling of cohesion among variegated data.
 
-# Data meshes are step in a sequence of data management architectures for handling
-# different commericial, industrial, and scientific requirements for data
-# interconnectivity. The simplest paradigm is a "data store," which may be just a single database operating at a central location. Then we have a "data warehouse," then a "data lake," and then "data meshes" and "data fabrics."
-
-# We can go one step further by defining a "data fabric," a data mesh which
-# implements a virtualization layer for unified access. In commercial
-# applications, a data fabric retrieves data from each source into memory to
-# allow for faster queries and a unified access protocol.
-
-# We have implemented the "data mesh" level of the data fabric. That is, we do
+# We have implemented a data fabric without the virtualization layer. That is, we do
 # not load data from our data sources into memory as a unified schema.
 # Currently, we rely on our **catalog** to both direct us to the right database
 # connection for our query as well as keep a record of the available

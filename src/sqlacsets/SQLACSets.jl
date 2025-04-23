@@ -10,13 +10,14 @@ using DBInterface
 
 using Reexport
 
-# hand-rolled SQL syntax. necessary for DML operations
+# hand-rolled SQL syntax. necessary for DML operations, since FunSQL does not provide that
 include("syntax.jl") 
 
 # defines the Data Fabric concept
 include("fabric/Fabric.jl")
 
-include("methods.jl") # the VirtualACSet
+# the VirtualACSet
+include("methods.jl")
 
 @reexport using .SQLACSetSyntax
 @reexport using .Fabric
