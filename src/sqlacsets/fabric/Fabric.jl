@@ -128,8 +128,8 @@ export render
 
 """ """
 function execute!(fabric::DataFabric, source_id::Int, stmt)
-    execute!(fabric.catalog[source_id, :conn], stmt)
-    recatalog!(fabric.catalog[source_id, :conn])
+    execute!(fabric.graph[source_id, :value], stmt)
+    # recatalog!(fabric.catalog[source_id, :conn])
 end
 export execute!
 
