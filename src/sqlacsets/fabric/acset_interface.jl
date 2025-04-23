@@ -18,6 +18,12 @@ function decide_source(fabric::DataFabric, attr::Pair{Symbol, Symbol})
     only(source)
 end
 
+function ACSetInterface.add_part!(fabric::DataFabric, table::Symbol, args...)
+    source = decide_source(fabric, :tname => table)
+    add_part!(source, table, args...)
+end
+export add_part!
+
 function ACSetInterface.nparts(fabric::DataFabric, table::Symbol)
     source = decide_source(fabric, :tname => table)
     nparts(source, table) 

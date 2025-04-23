@@ -26,6 +26,11 @@ function DenseACSets.acset_schema(m::InMemory)
 end
 export acset_schema
 
+function ACSetInterface.add_part!(m::InMemory, args...)
+    add_part!(m.value, args...)
+end
+export add_part!
+
 function ACSetInterface.add_parts!(m::InMemory, args...)
     add_parts!(m.value, args...)
 end
