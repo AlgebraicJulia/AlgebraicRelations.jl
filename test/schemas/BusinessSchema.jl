@@ -10,30 +10,29 @@ using DataFrames
 using SQLite
 using FunSQL: render, SQLDialect
 
-
 @present Business(FreeSchema) begin
-  (val!Salary, Name)::AttrType
-  (Employee, Manager, Income, Salary)::Ob
-  name::Attr(Employee, Name)
-  #
-  (man!employee, man!manager)::Hom(Manager, Employee)
-  #
-  inc!employee::Hom(Income, Employee)
-  inc!salary::Hom(Income, Salary)
-  #
-  sal!salary::Attr(Salary, val!Salary)
+    (val!Salary, Name)::AttrType
+    (Employee, Manager, Income, Salary)::Ob
+    name::Attr(Employee, Name)
+    #
+    (man!employee, man!manager)::Hom(Manager, Employee)
+    #
+    inc!employee::Hom(Income, Employee)
+    inc!salary::Hom(Income, Salary)
+    #
+    sal!salary::Attr(Salary, val!Salary)
 end
 
 busSchema = SQLSchema(Business; types = Dict(:val!Salary => Float64, :Name => String))
 
-db = SQLite.DB()
-splt_stmts = split(render_schema(busSchema), "\n")
+
+
 
 @testset "Generate DB Schema" begin
   
-  for stmt in splt_stmts
-    DBInterface.execute(db, stmt) isa SQLite.Query
-  end
+for stmt in splt_stmts
+    @test execute!(vas, stmt) isa SQLite.Query
+end
 
 end
 
@@ -56,10 +55,10 @@ insert_stmts = [
     "INSERT OR IGNORE INTO income   (employee, salary, id)    VALUES (4, 4, 4);"];
 
 for stmt in insert_stmts
-  DBInterface.execute(db, stmt)
+    DBInterface.execute(db, stmt)
 end
 
-tab = to_tables(busSchema)
+tab = SQLTable(busSchema)
 
 @testset "Generate SQL Queries" begin
 

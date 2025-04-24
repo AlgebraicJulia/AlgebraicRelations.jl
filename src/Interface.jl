@@ -6,16 +6,18 @@ using ..DB, ..Queries
 using LibPQ, DataFrames
 import LibPQ: Connection, Result, Statement
 
-# init_tables:
-# This function will initialize a database with the tables required for the
-# given schema argument
+""" init_tables:
+This function will initialize a database with the tables required for the
+given schema argument
+"""
 function init_tables(conn::Connection, schema)
   st = generate_schema_sql(schema)
   result = LibPQ.execute(conn, st)
 end
 
-# upload_csv:
-# This function uploads data from a CSV to the connected database
+""" upload_csv:
+This function uploads data from a CSV to the connected database
+"""
 function upload_csv(conn::Connection, table::String, filename::String)
   LibPQ.execute(conn, "COPY '$table' FROM '$filename' DELIMITER ',' CSV HEADER;")
 end

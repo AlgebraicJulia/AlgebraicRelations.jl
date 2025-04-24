@@ -5,6 +5,165 @@ using Catlab.CategoricalAlgebra
 using Tables
 using SQLite
 
+using FunSQL
+using FunSQL: render, reflect
+using MLStyle
+
+function AlgebraicRelations.reload!(source::DBSource{SQLite.DB})
+    conn = SQLite.DB()
+    source.conn = FunSQL.DB(conn, catalog=reflect(conn))
+end
+
+# DB specific, type conversion
+tosql(::DBSource{SQLite.DB}, ::Type{<:Real}) = "REAL"
+tosql(::DBSource{SQLite.DB}, ::Type{<:AbstractString}) = "TEXT"
+tosql(::DBSource{SQLite.DB}, ::Type{<:Symbol}) = "TEXT"
+tosql(::DBSource{SQLite.DB}, ::Type{<:Integer}) = "INTEGER"
+tosql(::DBSource{SQLite.DB}, T::DataType) = error("$T is not supported in this SQLite implementation")
+# value conversion
+tosql(::DBSource{SQLite.DB}, ::Nothing) = "NULL"
+tosql(::DBSource{SQLite.DB}, x::T) where T<:Number = x
+tosql(::DBSource{SQLite.DB}, s::Symbol) = string(s)
+tosql(::DBSource{SQLite.DB}, s::String) = "\'$s\'"
+tosql(::DBSource{SQLite.DB}, x) = x
+
+# TODO I don't like that the conversion function is also formatting. 
+# I would be at peace if formatting and value representation were separated
+function tosql(source::DBSource{SQLite.DB}, v::NamedTuple{T}; key::Bool=true) where T
+    join(collect(Iterators.map(pairs(v)) do (k, v)
+                     key ? "$(tosql(source, k)) = $(tosql(source, v))" : "$(tosql(source, v))"
+    end), ", ")
+end
+
+function tosql(source::DBSource{SQLite.DB}, values::Values{T}; key::Bool=true) where T
+    if length(values.vals) == 1
+        "$(tosql(source, only(values.vals); key=key))"
+    else
+        join(["($x)" for x ∈ tosql.(Ref(source), values.vals; key=key)], ", ")
+    end
+end
+
+
+# Render functions convert our intermediate syntax (ACSetInsert, etc.) into
+# strings in the target DB dialect.
+
+function FunSQL.render(source::DBSource{SQLite.DB}, i::ACSetInsert)
+    cols = join(columns(i.values), ", ")
+    values = join(["($x)" for x ∈ tosql.(Ref(source), i.values.vals; key=false)], ", ")
+    "INSERT IGNORE INTO $(i.table) ($cols) VALUES $values ;"
+end
+export render
+
+function FunSQL.render(source::DBSource{SQLite.DB}, u::ACSetUpdate) 
+    cols = join(columns(u.values), ", ")
+    wheres = !isnothing(u.wheres) ? render(source, u.wheres) : ""
+    "UPDATE $(u.table) SET $(tosql(source, u.values)) " * wheres * ";"
+end
+
+# TODO might have to refactor so we can reuse code for show method
+function FunSQL.render(source::DBSource{SQLite.DB}, s::ACSetSelect)
+    from = s.from isa Vector ? join(s.from, ", ") : s.from
+    qty = render(source, s.qty)
+    join = !isnothing(s.join) ? render(source, s.join) : " "
+    wheres = !isnothing(s.wheres) ? render(source, s.wheres) : ""
+    "SELECT $qty FROM $from " * join * wheres * ";"
+end
+
+function FunSQL.render(source::DBSource{SQLite.DB}, j::ACSetJoin)
+    "$(j.type) JOIN $(j.table) ON $(render(source, j.on))"
+end
+
+function FunSQL.render(source::DBSource{SQLite.DB}, ons::Vector{SQLEquation})
+    join(render.(Ref(source), ons), " AND ")
+end
+
+function FunSQL.render(source::DBSource{SQLite.DB}, eq::SQLEquation)
+    "$(eq.lhs.first).$(eq.rhs.second) = $(eq.rhs.first).$(eq.rhs.second)"
+end
+
+function FunSQL.render(source::DBSource{SQLite.DB}, qty::SQLSelectQuantity)
+    @match qty begin
+        ::SelectAll || ::SelectDistinct || ::SelectDistinctRow => "*"
+        SelectColumns(cols) => join(render.(Ref(source), cols), ", ")
+    end
+end
+
+function FunSQL.render(::DBSource{SQLite.DB}, column::Union{Pair{Symbol, Symbol}, Symbol})
+    @match column begin
+        ::Pair{Symbol, Symbol} => "$(column.first).$(column.second)"
+        _ => column
+    end
+end
+
+# TODO
+function FunSQL.render(::DBSource{SQLite.DB}, wheres::WhereClause)
+    @match wheres begin
+        WhereClause(op, d::Pair) => "WHERE $(d.first) $op ($(join(d.second, ", ")))"
+        _ => wheres
+    end
+end
+
+function FunSQL.render(source::DBSource, c::ACSetCreate)
+    create_stmts = map(objects(c.schema)) do ob
+        obattrs = attrs(c.schema; from=ob)
+        "CREATE TABLE IF NOT EXISTS $(ob)(" * 
+            join(filter(!isempty, ["_id INTEGER PRIMARY KEY",
+                # column_name column_type
+                join(map(homs(c.schema; from=ob)) do (col, src, tgt)
+                       tgttype = tosql(source, Int)
+                       "$(col) $tgttype"
+                end, ", "),
+                join(map(obattrs) do (col, _, type)
+                    # FIXME
+                    "$(col) $(tosql(source, subpart_type(source.acsettype(), type)))" 
+               end, ", ")]), ", ") * ");"
+    end
+    join(create_stmts, " ")
+end
+
+function FunSQL.render(source::DBSource{SQLite.DB}, d::ACSetDelete)
+    "DELETE FROM $(d.table) WHERE _id IN ($(join(d.ids, ",")))"
+end
+
+function FunSQL.render(::DBSource{SQLite.DB}, v::Values)
+    "VALUES " * join(entuple(v), ", ") * ";"
+end
+
+function FunSQL.render(::DBSource{SQLite.DB}, a::ACSetAlter)
+    "ALTER TABLE $(a.refdom) ADD CONSTRAINT fk_$(ref) FOREIGN KEY ($(a.ref)) REFERENCES $(a.refcodom)(_id); "
+end
+
+function FunSQL.render(::DBSource{SQLite.DB}, ::ShowTables)
+    "SELECT name FROM sqlite_master WHERE type='table';"
+end
+
+function FunSQL.render(::DBSource{SQLite.DB}, fkc::ForeignKeyChecks)
+    "SET FOREIGN_KEY_CHECKS = $(Int(fkc.bool)) ;"
+end
+
+# convenience
+function AlgebraicRelations.ForeignKeyChecks(source::DBSource{SQLite.DB}, stmt::String)
+    l, r = render.(Ref(conn), ForeignKeyChecks.([false, true]))
+    wrap(stmt, l, r)
+end
+
+# overloading syntactical constructors 
+function AlgebraicRelations.ACSetInsert(source::DBSource{SQLite.DB}, acset::ACSet)
+    map(objects(acset_schema(acset))) do ob
+        ACSetInsert(source, acset, ob)
+    end
+end
+
+function AlgebraicRelations.ACSetInsert(source::DBSource{SQLite.DB}, acset::ACSet, table::Symbol)
+    cols = colnames(acset, table)
+    vals = getrows(source, acset, table)
+    ACSetInsert(table, vals, nothing)
+end
+
+"""
+
+This constructs a SQLSchema
+"""
 function AlgebraicRelations.SQLSchema(db::SQLite.DB)
   sch = SQLSchema()
   tables = [t.name for t in SQLite.tables(db)]

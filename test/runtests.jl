@@ -1,7 +1,7 @@
 using Test
 
 @testset "Schemas" begin
-  include("Schemas.jl")
+  include("schemas/BusinessSchema.jl")
 end
 
 @testset "SQLite" begin
