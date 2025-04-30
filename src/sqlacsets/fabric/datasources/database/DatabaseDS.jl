@@ -46,7 +46,7 @@ end
 function Fabric.execute!(db::DBSource, stmt::AbstractSQLTerm; formatter=DataFrame)
     # @match statement because of DBInterface.execute
     result = @match stmt begin
-        ::ACSetInsert => DBInterface.execute(db.conn.raw, render(db, stmt))
+        ::ACSetInsert || ::ACSetUpdate => DBInterface.execute(db.conn.raw, render(db, stmt))
         _ => DBInterface.execute(db.conn, render(db, stmt))
     end
     recatalog!(db)

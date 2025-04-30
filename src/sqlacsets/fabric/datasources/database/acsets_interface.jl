@@ -13,7 +13,8 @@ function ACSetInterface.maxpart(db::DBSource, table::Symbol)
     DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
 
-function ACSetInterface.subpart(db::DBSource, table::Symbol)
+function ACSetInterface.subpart(db::DBSource, column::Symbol)
+    table = tablefromcolumn(db, column)
     query = FROM(table) |> SELECT(*) 
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
     metadata!(df, "ob", table; style=:note)
@@ -21,6 +22,7 @@ function ACSetInterface.subpart(db::DBSource, table::Symbol)
 end
 
 function tablefromcolumn(db::DBSource, column::Symbol)
+    # TODO here we are using the local catalog.
     indices = map(values(db.conn.catalog.tables)) do table
         haskey(table.columns, column)
     end
@@ -30,7 +32,6 @@ end
 
 function ACSetInterface.subpart(db::DBSource, ks::Vector{Int}, column::Symbol)
     table = tablefromcolumn(db, column)
-    !isempty(table) || return nothing
     query = FROM(table) |> WHERE(FUN("in", :_id, ks...)) |> SELECT(column)
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
@@ -65,7 +66,7 @@ end
 # TODO names::Vector{Symbol}
 function ACSetInterface.incident(db::DBSource, vals::Vector, column::Symbol)
     table = tablefromcolumn(db, column)
-    query = From(table) |> Where(Fun.in(Get(column), vals...)) |> Select(:_id)
+    query = FROM(table) |> WHERE(FUN("in", column, vals...)) |> SELECT(:_id)
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
 
