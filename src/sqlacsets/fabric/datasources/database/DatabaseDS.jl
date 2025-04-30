@@ -37,16 +37,19 @@ export recatalog!
 
 function Fabric.execute!(db::DBSource, stmt::AbstractString; formatter=DataFrame)
     result = DBInterface.execute(db.conn.raw, stmt)
+    recatalog!(db)
     isnothing(formatter) && return result
     formatter(result)
 end
 
+# TODO could probably implement `isDML(::AbstractSQLTerm) = true` for types that are
 function Fabric.execute!(db::DBSource, stmt::AbstractSQLTerm; formatter=DataFrame)
     # @match statement because of DBInterface.execute
     result = @match stmt begin
         ::ACSetInsert => DBInterface.execute(db.conn.raw, render(db, stmt))
         _ => DBInterface.execute(db.conn, render(db, stmt))
     end
+    recatalog!(db)
     isnothing(formatter) && return result
     formatter(result)
 end
