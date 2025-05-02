@@ -1,8 +1,10 @@
 module SQLiteTest
 
-using Catlab, ACSets
+using ACSets
+using Catlab 
 using AlgebraicRelations
 
+using Test
 using DataFrames
 using SQLite, DBInterface
 
@@ -17,7 +19,6 @@ classes = Class{Symbol}()
 class_db = DBSource(SQLite.DB(), acset_schema(classes))
 execute!(class_db, "create table `Class` (_id int, subject varchar(255))")
 
-# TODO should reify
 x = add_part!(class_db, :Class, [(_id=1, subject="Chemistry"), (_id=2, subject="Physics")])
 @test isempty(x)
 
