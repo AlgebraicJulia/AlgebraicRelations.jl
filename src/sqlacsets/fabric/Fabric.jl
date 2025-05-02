@@ -65,10 +65,10 @@ export DataFabric
 function catalog end
 export catalog
 
+# accessor
 catalog(fabric::DataFabric) = fabric.catalog
 
-"""
-"""
+""" pointwise recataloging of nodes """
 function recatalog!(fabric::DataFabric)
     foreach(parts(fabric.graph, :V)) do i    
         fabric.graph[i, :value] = recatalog!(subpart(fabric.graph, i, :value))
@@ -76,8 +76,7 @@ function recatalog!(fabric::DataFabric)
     fabric
 end
 
-# TODO don't want copy sources
-# TODO need idempotence
+# TODO don't want copy sources , TODO need idempotence
 function reflect!(fabric::DataFabric)
     foreach(parts(fabric.graph, :V)) do source_id
         source = subpart(fabric.graph, source_id, :value)
@@ -103,8 +102,7 @@ function reflect!(fabric::DataFabric)
 end
 export reflect!
 
-# Adding to the Fabric
-
+# mutators 
 function add_source!(fabric::DataFabric, source::AbstractDataSource)
     add_part!(fabric.graph, :V, value=source)
 end
@@ -133,6 +131,7 @@ function execute!(fabric::DataFabric, source_id::Int, stmt)
 end
 export execute!
 
+# ACSet Interface for the Fabric. It determines which data source to dispatch the ACSet function on
 include("acset_interface.jl")
 
 include("datasources/database/DatabaseDS.jl")
