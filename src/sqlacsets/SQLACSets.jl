@@ -1,15 +1,26 @@
 module SQLACSets
 
 using ACSets
+using Catlab
 
 using MLStyle
 using FunSQL
 using DataFrames
 using DBInterface
 
-# hand-rolled SQL syntax. necessary for DML operations
+using Reexport
+
+# hand-rolled SQL syntax. necessary for DML operations, since FunSQL does not provide that
 include("syntax.jl") 
-include("methods.jl") # the VirtualACSet
-include("acsets_interface.jl") # ACSetInterface
+
+# defines the Data Fabric concept
+include("fabric/Fabric.jl")
+
+# the VirtualACSet
+include("methods.jl")
+
+@reexport using .SQLACSetSyntax
+@reexport using .Fabric
+
 
 end

@@ -1,8 +1,10 @@
-module SQLiteInterop
+module DuckDBAlgRelExt
+
 using AlgebraicRelations.Schemas
 using Catlab.CategoricalAlgebra
 using Tables
 using ...SQLite
+
 
 function AlgebraicRelations.SQLSchema(db::SQLite.DB)
   sch = SQLSchema()
@@ -32,4 +34,5 @@ function AlgebraicRelations.SQLSchema(db::SQLite.DB)
   end
   sch
 end
+
 end

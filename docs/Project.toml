@@ -1,4 +1,11 @@
 [deps]
+ACSets = "227ef7b5-1206-438b-ac65-934d6da304b8"
 AlgebraicRelations = "1c3ea84b-a956-4dfe-a2f4-485757f48f1d"
+Catlab = "134e5e36-593f-5add-ad60-77f754baafbe"
+DBInterface = "a10d1c49-ce27-4219-8d33-6db1a4562965"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+FunSQL = "cf6cc811-59f4-4a10-b258-a8547a8f6407"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
+MLStyle = "d8e11817-5142-5d16-987a-aa16d5891078"
+SQLite = "0aa819cd-b072-5ff4-a722-6bc24af294d9"

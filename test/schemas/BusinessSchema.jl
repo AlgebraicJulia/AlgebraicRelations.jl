@@ -25,14 +25,8 @@ end
 
 busSchema = SQLSchema(Business; types = Dict(:val!Salary => Float64, :Name => String))
 
-db = SQLite.DB()
-splt_stmts = split(render_schema(busSchema), "\n")
 
-vas = VirtualACSet(db)
 
-for stmt in splt_stmts
-    execute!(vas, stmt)
-end
 
 @testset "Generate DB Schema" begin
   
