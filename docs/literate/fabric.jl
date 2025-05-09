@@ -56,7 +56,7 @@ execute!(class_db,
     (1, "Math"), (2, "Philosophy"), (3, "Music"),
     (4, "Cooking"), (5, "CompSci"), (6, "Gym"), (7, "Art")
     """)
-subpart(class_db, :class) # TODO notice how we don't query by column. 
+subpart(class_db, :subject) 
 
 # We will reconcile them locally with a junction table that has a reference to them, schematized as simply a "Junction" object. Since we are not yet ready to add constraints to both Student and Class, the Junction schema--essentially a table of just references--is very plain.
 @present SchSpan(FreeSchema) begin
