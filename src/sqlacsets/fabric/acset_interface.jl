@@ -1,5 +1,8 @@
 # ACSet Interface
 
+get_table(column) = From(:Table=>:tname)|>
+                    Where(:Table, From(:Column=>:table)|>Where(:cname, column))
+
 # TODO refactor to use graph
 function decide_source(fabric::DataFabric, attr::Pair{Symbol, Tuple{Symbol, Symbol}})
     id = incident(fabric.catalog, attr.second[1], attr.first)
@@ -61,13 +64,16 @@ function ACSetInterface.subpart(fabric::DataFabric, id, column::Pair{Symbol, Sym
     subpart(only(source), id, column.second)
 end
 
-function ACSetInterface.incident(fabric::DataFabric, id, column)
+function ACSetInterface.incident(fabric::DataFabric, id, column::Symbol)
     source = decide_source(fabric, :cname => column)
-    table = subpart(fabric.catalog, subpart(fabric.catalog, incident(fabric.catalog, column, :cname), :table), :tname) |> only
-    table = Symbol(lowercase(string(table)))
-    incident(source, id, table => column)
+    _, table = get_table(column)(fabric.catalog) |> only
+    incident(source, id, only(table) => column)
 end
 export incident
+
+function ACSetInterface.incident(fabric::DataFabric, id, columns::Vector{Symbol})
+    reduce((new_id, column) -> incident(fabric, new_id, column), columns; init=id)
+end
 
 function ACSetInterface.incident(fabric::DataFabric, value, tablecol::Tuple{Symbol, Symbol})
     source = decide_source(fabric, :tname => tablecol)
