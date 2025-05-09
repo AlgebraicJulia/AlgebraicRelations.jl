@@ -5,16 +5,12 @@ using AlgebraicRelations
 # impl Description
 # impl Auditing
 
-struct FK{T<:ACSet} 
-    val
-end
-
 fabric = DataFabric()
 
 @present SchCountry(FreeSchema) begin
     Name::AttrType
     Country::Ob
-    (name, code)::Attr(Country, Name)
+    (country, code)::Attr(Country, Name)
 end
 @acset_type Country(SchCountry)
 country = InMemory(Country{Symbol}())
@@ -24,21 +20,22 @@ country_src = add_source!(fabric, country)
     (Name, Country)::AttrType
     Winemaker::Ob
     country_code::Attr(Winemaker, Country)
-    name::Attr(Winemaker, Name)
+    wm_name::Attr(Winemaker, Name) # TODO "name" does not get entered
     # fk constraint means that there is *some* schema out there
 end
 @acset_type Winemaker(SchWinemaker)
 winemaker = InMemory(Winemaker{Symbol, FK{Country}}())
-winemarker_src = add_source!(fabric, winemaker)
-add_fk!(fabric, winemarker_src, country_src, :Winemaker!country_code => :Country!Country_id)
+winemaker_src = add_source!(fabric, winemaker)
+add_fk!(fabric, winemaker_src, country_src, :Winemaker!country_code => :Country!Country_id)
 
 @present SchInfoSource(FreeSchema) begin
-    Name::AttrType
+    (Name, Description)::AttrType
     InfoSource::Ob
-    (code, desc)::Attr(InfoSource, Name)
+    code::Attr(InfoSource, Name)
+    desc::Attr(InfoSource, Description)
 end
 @acset_type InfoSource(SchInfoSource)
-infosources = InMemory(InfoSource{Symbol}())
+infosources = InMemory(InfoSource{Symbol, String}())
 infosource_src = add_source!(fabric, infosources)
 
 @present SchRatingGuide(FreeSchema) begin
@@ -63,6 +60,7 @@ winecolor_src = add_source!(fabric, winecolor)
     (Name, Price, WineColor, Winemaker)::AttrType
     Wine::Ob
     color::Attr(Wine, WineColor)
+    maker::Attr(Wine, Winemaker)
     # TODO winemaker?
     (code, name, desc, good_years)::Attr(Wine, Name)
     (bottle_price, half_price)::Attr(Wine, Price)
@@ -70,6 +68,7 @@ end
 @acset_type Wine(SchWine)
 wine = InMemory(Wine{Symbol, Int, FK{WineColor}, FK{Winemaker}}())
 wine_src = add_source!(fabric, wine)
+add_fk!(fabric, wine_src, winecolor_src, :Wine!color => :WineColor!WineColor_id)
 add_fk!(fabric, wine_src, winecolor_src, :Wine!color => :WineColor!WineColor_id)
 
 @present SchFood(FreeSchema) begin
@@ -93,7 +92,7 @@ end
 winefood = InMemory(WineFood{FK{Wine}, FK{Food}}())
 winefood_src = add_source!(fabric, winefood)
 add_fk!(fabric, winefood_src, food_src, :WineFood!food => :Food!Food_id)
-add_fk!(fabric, winefood_src, wine_src, :WineFood!wine => :Wine!Wine_id)
+add_fk!(fabric, winefood_src, winemaker_src, :WineFood!wine => :Winemaker!Winemaker_id)
 
 @present SchMerchant(FreeSchema) begin
     Name::AttrType
@@ -118,20 +117,23 @@ winemerchant_src = add_source!(fabric, winemerchants)
 add_fk!(fabric, winemerchant_src, wine_src, :WineMerchant!wine => :Wine!Wine_id)
 add_fk!(fabric, winemerchant_src, merchant_src, :WineMerchant!merchant => :Merchant!Merchant_id)
 
+# TODO all columns have the INTEGER type
 reflect!(fabric)
 
 # won't work until reflection happens
-add_part!(fabric, :Country, name=:Antarctica, code=:ANT) 
+add_part!(fabric, :Country, country=:Antarctica, code=:ANT) 
 
 subpart(fabric, :name) 
 # TODO use accessor (!) syntax here, since there are multiple columns called `name`
 
 # code needs to be an integer referencing country code
-add_part!(fabric, :Winemaker, name=:BJs, country_code=FK{Country}(1))
+add_part!(fabric, :Winemaker, wm_name=:BJs, country_code=FK{Country}(1))
 
 subpart(fabric, :country_code)
 
-add_part!(fabric, :InfoSource, code=:something, desc=:description)
+subpart(fabric, :Winemaker => :wm_name)
+
+add_part!(fabric, :InfoSource, code=:something, desc="a nice description")
 
 subpart(fabric, :desc)
 
@@ -140,7 +142,7 @@ add_part!(fabric, :RatingGuide, color=:red, desc=:description)
 
 add_part!(fabric, :WineColor, color=:red)
 
-add_part!(fabric, :Wine, color=FK{WineColor}(1), code=:chianti, name=:Chianti, desc=:dry, good_years=:should_be_int, bottle_price=6, half_price=3)
+add_part!(fabric, :Wine, color=FK{WineColor}(1), maker=FK{Winemaker}(1), code=:chianti, name=:Chianti, desc=:dry, good_years=:should_be_int, bottle_price=6, half_price=3)
 
 add_part!(fabric, :Food, comments=:should_be_string)
 
@@ -149,3 +151,5 @@ add_part!(fabric, :WineFood, food=FK{Food}(1), wine=FK{Wine}(1))
 add_part!(fabric, :Merchant, name=:ABC)
 
 add_part!(fabric, :WineMerchant, wine=FK{Wine}(1), merchant=FK{Merchant}(1), interval=:week, price=1)
+
+subpart(fabric, [:maker, :country_code, :country])
