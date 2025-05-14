@@ -1,5 +1,8 @@
 # ACSet Interface
 
+get_table(column) = From(:Table=>:tname)|>
+                    Where(:Table, From(:Column=>:table)|>Where(:cname, column))
+
 # TODO refactor to use graph
 function decide_source(fabric::DataFabric, attr::Pair{Symbol, Tuple{Symbol, Symbol}})
     id = incident(fabric.catalog, attr.second[1], attr.first)
@@ -37,6 +40,16 @@ end
 export maxpart
 
 function ACSetInterface.subpart(fabric::DataFabric, column::Symbol)
+    subpart(fabric, :, column) 
+end
+export subpart
+
+
+function ACSetInterface.subpart(fabric::DataFabric, fks::Vector{FK{T}}, column::Symbol) where T
+    subpart(fabric, getproperty.(fks, :val), column)
+end
+
+function ACSetInterface.subpart(fabric::DataFabric, id, column::Symbol)
     column = if isempty(incident(fabric.catalog, column, :tname))
         column
     else
@@ -45,29 +58,49 @@ function ACSetInterface.subpart(fabric::DataFabric, column::Symbol)
     source = decide_source(fabric, :cname => column)
     tableid = subpart(fabric.catalog, incident(fabric.catalog, column, :cname), :table)
     table = subpart(fabric.catalog, tableid, :tname) |> only
-    subpart(source, :, table => column)
+    # TODO move handling of FK types to another method
+    id = eltype(id) <: FK ? getproperty.(id, :val) : id
+    subpart(source, id, table => column)
 end
-export subpart
 
+# Winemaker => name
 function ACSetInterface.subpart(fabric::DataFabric, id, column::Pair{Symbol, Symbol})
     # get columns
     columns = subpart(fabric.catalog, incident(fabric.catalog, column.first, [:table, :tname]), :cname)
     @assert !isempty(columns[columns .== column.second])
-    source = subpart(fabric.catalog, 
-                     subpart(fabric.catalog, 
+    # TODO simplify
+    source = subpart(fabric.graph, 
+                     subpart(fabric.catalog,
+                             # get the id of the table
                              incident(fabric.catalog, column.first, :tname),
                              :source), 
-                     :conn)
+                     :value)
     subpart(only(source), id, column.second)
 end
 
-function ACSetInterface.incident(fabric::DataFabric, id, column)
+function ACSetInterface.subpart(fabric::DataFabric, column::Pair{Symbol, Symbol})
+    subpart(fabric, :, column)
+end
+
+function ACSetInterface.subpart(fabric::DataFabric, columns::Vector{Symbol})
+    subpart(fabric, :, columns)
+end
+
+function ACSetInterface.subpart(fabric::DataFabric, id=(:), columns::Vector{Symbol}=[])
+    reduce((new_id, column) -> subpart(fabric, new_id, column), columns; init=id)
+end
+
+function ACSetInterface.incident(fabric::DataFabric, id, column::Symbol)
+    # TODO could be multiple
     source = decide_source(fabric, :cname => column)
-    table = subpart(fabric.catalog, subpart(fabric.catalog, incident(fabric.catalog, column, :cname), :table), :tname) |> only
-    table = Symbol(lowercase(string(table)))
-    incident(source, id, table => column)
+    _, table = get_table(column)(fabric.catalog) |> only
+    incident(source, id, only(table) => column)
 end
 export incident
+
+function ACSetInterface.incident(fabric::DataFabric, id, columns::Vector{Symbol})
+    reduce((new_id, column) -> incident(fabric, new_id, column), columns; init=id)
+end
 
 function ACSetInterface.incident(fabric::DataFabric, value, tablecol::Tuple{Symbol, Symbol})
     source = decide_source(fabric, :tname => tablecol)

@@ -37,8 +37,8 @@ end
 export add_parts!
 
 function ACSetInterface.subpart(m::InMemory, (:), tablecolumn::Pair{Symbol, Symbol})
-    result = subpart(m.value, :, tablecolumn.second)
-    DataFrame(NamedTuple{(tablecolumn.second,)}(Tuple([result])))
+    subpart(m.value, :, tablecolumn.second)
+    # DataFrame(NamedTuple{(tablecolumn.second,)}(Tuple([result])))
 end
 export subpart
 
