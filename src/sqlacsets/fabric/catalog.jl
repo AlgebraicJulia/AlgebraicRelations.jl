@@ -57,10 +57,12 @@ function add_to_catalog!(catalog::Catalog, s::SQLSchema{T}; source=nothing, conn
     end
     foreach(subpart(s, :, :cname)) do column
         # get the id of the table
+        #
         sch_cid = incident(s, column, :cname)
         sch_tname = subpart(s, subpart(s, sch_cid, :table), :tname) |> only
         catalog_tid = incident(catalog, Symbol(sch_tname), :tname)
-        @something emptyMaybe(incident(catalog, Symbol(column), :cname)) add_part!(catalog, :Column, table=only(catalog_tid), cname=Symbol(column), type=:INTEGER)
+        coltype = occursin("_id", column) ? id : haskey(types, Symbol(column)) ? Symbol(types[Symbol(column)]) : :Unknown
+        @something emptyMaybe(incident(catalog, Symbol(column), :cname)) add_part!(catalog, :Column, table=only(catalog_tid), cname=Symbol(column), type=coltype)
     end
     foreach(parts(s, :FK)) do fk
         from = subpart(s, subpart(s, fk, :from), :cname)

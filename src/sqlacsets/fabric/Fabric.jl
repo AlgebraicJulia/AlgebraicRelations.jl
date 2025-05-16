@@ -42,7 +42,7 @@ include("catalog.jl")
 end
 @acset_type DataSourceGraph(SchEnrichedGraph)
 
-DataSourceGraph() = DataSourceGraph{DataType, AbstractDataSource, Pair{Symbol, Symbol}}()
+DataSourceGraph() = DataSourceGraph{Symbol, AbstractDataSource, Pair{Symbol, Symbol}}()
 export DataSourceGraph
 
 # DataFabric
@@ -81,7 +81,7 @@ function reflect!(fabric::DataFabric)
     foreach(parts(fabric.graph, :V)) do source_id
         source = subpart(fabric.graph, source_id, :value)
         schema = SQLSchema(Presentation(acset_schema(source)))
-        add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(source))
+        add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(source), types=columntypes(source))
     end
     # TODO improve this
     foreach(parts(fabric.graph, :E)) do edge_id
@@ -110,7 +110,7 @@ export FK
 
 # mutators 
 function add_source!(fabric::DataFabric, source::AbstractDataSource)
-    add_part!(fabric.graph, :V, value=source)
+    add_part!(fabric.graph, :V, label=nameof(source), value=source)
 end
 export add_source!
 
