@@ -27,6 +27,8 @@ function DBSource(conn::Conn, schema=nothing) where Conn
     DBSource{Conn}(schema=schema, conn=funconn)
 end
 
+Base.nameof(db::DBSource) = nothing
+
 Fabric.catalog(db::DBSource) = db.conn.catalog
 
 function Fabric.recatalog!(db::DBSource)

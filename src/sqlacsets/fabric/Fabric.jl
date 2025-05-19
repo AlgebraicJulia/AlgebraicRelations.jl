@@ -23,6 +23,15 @@ import FunSQL: render
 
 using Reexport
 
+struct PK end
+export PK
+
+# foreign key wrapper
+struct FK{T<:ACSet} 
+    val
+end
+export FK
+
 # DATA SOURCES
 abstract type AbstractDataSource end
 export AbstractDataSource
@@ -102,11 +111,6 @@ function reflect!(fabric::DataFabric)
 end
 export reflect!
 
-# foreign key wrapper
-struct FK{T<:ACSet} 
-    val
-end
-export FK
 
 # mutators 
 function add_source!(fabric::DataFabric, source::AbstractDataSource)
