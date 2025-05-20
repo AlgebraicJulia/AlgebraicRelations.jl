@@ -98,13 +98,11 @@ add_fk!(fabric, winemerchant_src, merchant_src, :WineMerchant!merchant => :Merch
 
 reflect!(fabric)
 
-# won't work until reflection happens
 add_part!(fabric, :Country, country=:Antarctica, code=:ANT) 
 
 @test subpart(fabric, :country) == [:Antarctica]
 # TODO use accessor (!) syntax here, since there are multiple columns called `name`
 
-# code needs to be an integer referencing country code
 add_part!(fabric, :Winemaker, wm_name=:BJs, country_code=FK{Country}(1))
 
 @test subpart(fabric, :country_code) == [FK{Country}(1)]

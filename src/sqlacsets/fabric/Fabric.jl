@@ -23,6 +23,9 @@ import FunSQL: render
 
 using Reexport
 
+function columntypes end
+export columntypes
+
 struct PK end
 export PK
 
@@ -35,6 +38,15 @@ export FK
 # DATA SOURCES
 abstract type AbstractDataSource end
 export AbstractDataSource
+
+get_schema(::AbstractDataSource) = []
+export get_schema
+
+function to_sql end
+export to_sql
+
+function from_sql end
+export from_sql
 
 function recatalog! end
 export recatalog!
@@ -90,7 +102,8 @@ function reflect!(fabric::DataFabric)
     foreach(parts(fabric.graph, :V)) do source_id
         source = subpart(fabric.graph, source_id, :value)
         schema = SQLSchema(Presentation(acset_schema(source)))
-        add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(source), types=columntypes(source))
+        types = columntypes(source)
+        add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(source), types=types)
     end
     # TODO improve this
     foreach(parts(fabric.graph, :E)) do edge_id
@@ -110,7 +123,6 @@ function reflect!(fabric::DataFabric)
     catalog(fabric)
 end
 export reflect!
-
 
 # mutators 
 function add_source!(fabric::DataFabric, source::AbstractDataSource)
