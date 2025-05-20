@@ -27,11 +27,21 @@ function DBSource(conn::Conn, schema=nothing) where Conn
     DBSource{Conn}(schema=schema, conn=funconn)
 end
 
-Fabric.catalog(db::DBSource) = db.conn.catalog
+Base.nameof(source::DBSource) = nothing
 
-function Fabric.recatalog!(db::DBSource)
-    db.conn = FunSQL.DB(db.conn.raw, catalog=reflect(db.conn.raw))
-    db
+Fabric.catalog(source::DBSource) = source.conn.catalog
+
+# column => type
+function Fabric.columntypes(source::DBSource)
+    result = get_schema(source)
+    Dict([
+          Symbol(row.column_name) => row.is_primary_key == 1 ? PK : from_sql(source, row.data_type) for row in eachrow(result)
+    ])
+end
+
+function Fabric.recatalog!(source::DBSource)
+    source.conn = FunSQL.DB(source.conn.raw, catalog=reflect(source.conn.raw))
+    source
 end
 export recatalog!
 

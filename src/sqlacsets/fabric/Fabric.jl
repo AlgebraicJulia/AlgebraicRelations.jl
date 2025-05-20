@@ -23,9 +23,30 @@ import FunSQL: render
 
 using Reexport
 
+function columntypes end
+export columntypes
+
+struct PK end
+export PK
+
+# foreign key wrapper
+struct FK{T<:ACSet} 
+    val
+end
+export FK
+
 # DATA SOURCES
 abstract type AbstractDataSource end
 export AbstractDataSource
+
+get_schema(::AbstractDataSource) = []
+export get_schema
+
+function to_sql end
+export to_sql
+
+function from_sql end
+export from_sql
 
 function recatalog! end
 export recatalog!
@@ -42,7 +63,7 @@ include("catalog.jl")
 end
 @acset_type DataSourceGraph(SchEnrichedGraph)
 
-DataSourceGraph() = DataSourceGraph{DataType, AbstractDataSource, Pair{Symbol, Symbol}}()
+DataSourceGraph() = DataSourceGraph{Symbol, AbstractDataSource, Pair{Symbol, Symbol}}()
 export DataSourceGraph
 
 # DataFabric
@@ -81,7 +102,8 @@ function reflect!(fabric::DataFabric)
     foreach(parts(fabric.graph, :V)) do source_id
         source = subpart(fabric.graph, source_id, :value)
         schema = SQLSchema(Presentation(acset_schema(source)))
-        add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(source))
+        types = columntypes(source)
+        add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(source), types=types)
     end
     # TODO improve this
     foreach(parts(fabric.graph, :E)) do edge_id
@@ -102,15 +124,9 @@ function reflect!(fabric::DataFabric)
 end
 export reflect!
 
-# foreign key wrapper
-struct FK{T<:ACSet} 
-    val
-end
-export FK
-
 # mutators 
 function add_source!(fabric::DataFabric, source::AbstractDataSource)
-    add_part!(fabric.graph, :V, value=source)
+    add_part!(fabric.graph, :V, label=nameof(source), value=source)
 end
 export add_source!
 

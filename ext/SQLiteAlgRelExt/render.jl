@@ -83,6 +83,24 @@ function FunSQL.render(source::DBSource, c::ACSetCreate)
     join(create_stmts, " ")
 end
 
+function FunSQL.render(source::DBSource, t::ACSet)
+    s = acset_schema(t)
+    stmts = map(objects(s)) do ob
+        obattrs = attrs(s; from=ob)
+        "CREATE TABLE IF NOT EXISTS $ob(" *
+        join(filter(!isempty, ["_id INTEGER PRIMARY KEY",
+            join(map(homs(s; from=ob)) do (col, _, _)
+                tgttype = to_sql(source, Int)
+                "$col $tgttype"
+            end, ", "),
+            join(map(obattrs) do (col, src, tgt)
+                "$col $(to_sql(source, subpart_type(t, tgt)))"
+            end, ", ")
+           ]), ", ") * ");"
+    end
+    join(stmts, " ")
+end
+
 function FunSQL.render(source::DBSource{SQLite.DB}, d::ACSetDelete)
     "DELETE FROM $(d.table) WHERE _id IN ($(join(d.ids, ",")))"
 end

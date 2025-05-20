@@ -4,11 +4,12 @@ using ACSets
 
 using DataFrames
 using ..Fabric
-import ..Fabric: recatalog!
+import ..Fabric: recatalog!, columntypes
 
 # this is an ACSet
 mutable struct InMemory <: AbstractDataSource
     value
+    # TODO need better method
     function InMemory(value::AbstractDataSource)
         error("No!")
     end
@@ -17,6 +18,18 @@ mutable struct InMemory <: AbstractDataSource
     end
 end
 export InMemory
+
+Base.nameof(m::InMemory) = nameof(m.value)
+
+Base.nameof(x::ACSet) = nameof(typeof(x))
+
+Fabric.columntypes(m::InMemory) = columntypes(m.value)
+
+function Fabric.columntypes(x::ACSet)
+    schema = acset_schema(x)
+    attrtype_mapping = Dict([col => type for (col, type) in zip(attrtypes(schema), [typeof(x).parameters...])])
+    Dict([name => attrtype_mapping[attrtype] for (name, _, attrtype) in acset_schema(x).attrs]...)
+end
 
 function recatalog!(m::InMemory); m end
 export recatalog!
