@@ -44,6 +44,10 @@ function ACSetInterface.subpart(fabric::DataFabric, column::Symbol)
 end
 export subpart
 
+# TODO
+# function ACSetInterface.subpart(fabric::DataFabric, column::PK{T<:ACSet})
+#     nparts(fabric.graph
+# end
 
 function ACSetInterface.subpart(fabric::DataFabric, fks::Vector{FK{T}}, column::Symbol) where T
     subpart(fabric, getproperty.(fks, :val), column)
