@@ -30,22 +30,27 @@ function tablefromcolumn(db::DBSource, column::Symbol)
     collect(keys(db.conn.catalog.tables))[findfirst(indices)]
 end
 
+# TODO we should be table to get the primary key from the catalog. for SQLite, we can get the primary key 
 function ACSetInterface.subpart(db::DBSource, ks::Vector{Int}, column::Symbol)
     table = tablefromcolumn(db, column)
-    query = FROM(table) |> WHERE(FUN("in", :_id, ks...)) |> SELECT(column)
-    df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
+    subpart(db, ks, table => column)
 end
 
 function ACSetInterface.subpart(db::DBSource, key::Int, column::Symbol)
     subpart(db, [key], column)
 end
 
-function ACSetInterface.subpart(db::DBSource, (:), tablecolumn::Pair{Symbol, Symbol})
+function ACSetInterface.subpart(db::DBSource, ks::Vector{Int}, tablecolumn::Pair{Symbol, Symbol})
+    query = FROM(tablecolumn.first) |> WHERE(FUN("in", :_id, ks...)) |> SELECT(tablecolumn.second)
+    df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
+end
+
+function ACSetInterface.subpart(db::DBSource, ::Colon, tablecolumn::Pair{Symbol, Symbol})
     query = FROM(tablecolumn.first) |> SELECT(tablecolumn.second)
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
 
-function ACSetInterface.subpart(db::DBSource, (:), column::Symbol)
+function ACSetInterface.subpart(db::DBSource, ::Colon, column::Symbol)
     query = FROM(table) |> SELECT(column)
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end

@@ -48,15 +48,19 @@ add_part!(fabric, :Winemaker, [(_id=1, country_code=1, wm_name=:Banfi)
 
 execute!(winemaker_db, "select * from Winemaker")
 
+using MLStyle: @match, @λ
 using ACSets.Query
 import ACSets.Query: WhereCondition, AndWhere, OrWhere
 
-# TODO add the Join statement to track where
+# TODO add the Join statement to track the first where
 q = From(:Winemaker) |> Where([:Winemaker, :country_code], ==, [:Country, :id]) |>
-                        Where([:Country, :country], ==, "France") |>
-                        Where([:Country, :country], ==, "USA")
+                        Where([:Country, :country], ==, "France")
 
-function Fabric.execute!(q::ACSets.Query.ACSetSQLNode)
+struct TableConds
+    conds::Dict{Vector{Symbol}, Vector{WhereCondition}}
+end
+
+function TableConds(q::ACSets.Query.ACSetSQLNode)
     result = Dict{Vector{Symbol}, Vector{WhereCondition}}()
     walk = @λ begin
         wheres::Vector{ACSets.Query.AbstractCondition} -> walk.(wheres)
@@ -70,11 +74,11 @@ function Fabric.execute!(q::ACSets.Query.ACSetSQLNode)
         _ => nothing 
     end
     walk(q.cond)
-    result |> unique
+    TableConds(result)
 end
 ## render to 
 
-p = execute!(q)
+d = execute!(q)
 
 # TODO have table alias
 function render(source::DBSource{SQLite.DB}, wc::WhereCondition)
@@ -85,17 +89,34 @@ function ACSetInterface.incident(fabric::DataFabric, wc::WhereCondition)
     incident(fabric, Symbol(wc.rhs), wc.lhs[2])
 end
 
-incident(fabric, p[1].second[1])
-
-# if a key is an adhesion, then query the easiest one, and pass the ids in as a where statement
-p[2].second
-
-function joint_execute(fabric::DataFabric, wc)
-
-    # query Country_id
-
+function Fabric.execute!(fabric::DataFabric, q::ACSets.Query.ACSetSQLNode)
+    d = TableConds(q)
+    # query independent tables
+    tables = filter(x -> length(x) == 1, keys(d.conds))
+    # get their results. we assume "OR" right now
+    itr = Dict(Iterators.map(tables) do table
+        [only(table), :id] => collect(Iterators.flatten(incident.(Ref(fabric), d.conds[table])))
+    end)
+    @info itr
+    # if a key is an adhesion, then query the easiest one, 
+    # and pass the ids in as a where statement
+    adh_tables = filter(x -> length(x) == 2, keys(d.conds))
+    #
+    tablefields = Iterators.map(adh_tables) do table
+        rhs = getfield.(d.conds[table], :rhs)
+        lhs = getfield.(d.conds[table], :lhs)
+        # itr[first(rhs)] gets the ids from the `itr` variable
+        # this returns the _ids of the matchs
+        df = incident(fabric, itr[first(rhs)], first(lhs)[2])
+        # @info df, first(lhs)[2]
+        table => df
+        # table => subpart(fabric, df._id, :country)
+    end |> collect
+    # get the table associated to the righthand WhereCondition
+    # select the RHS.col where the ids agree
 end
 
+execute!(fabric, q)
 
 execute!(fabric,
 """
