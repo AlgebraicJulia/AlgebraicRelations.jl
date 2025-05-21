@@ -66,6 +66,31 @@ end
 DataSourceGraph() = DataSourceGraph{Symbol, AbstractDataSource, Pair{Symbol, Symbol}}()
 export DataSourceGraph
 
+Catlab.src(g::DataSourceGraph, e::Int) = subpart(g, e, :src)
+Catlab.tgt(g::DataSourceGraph, e::Int) = subpart(g, e, :tgt)
+
+function Catlab.to_graphviz(g::DataSourceGraph)::Graphviz.Graph
+    gv_name(v::Int) = "$(something(subpart(g, v, :label), :a))"
+    gv_path(e::Int) = [gv_name(src(g,e)), gv_name(tgt(g,e))]
+    stmts = Graphviz.Statement[]
+    for v in parts(g, :V)
+        push!(stmts, Graphviz.Node(gv_name(v), Dict()))
+    end
+    for e in parts(g, :E)
+        push!(stmts, Graphviz.Edge(gv_path(e), Dict()))
+    end
+    # attrs = gprops(g)
+    Graphviz.Graph(
+      name = "G",
+      directed = true,
+      # prog = get(attrs, :prog, is_directed ? "dot" : "neato"),
+      stmts = stmts,
+      # graph_attrs = get(attrs, :graph, Dict()),
+      # node_attrs = get(attrs, :node, Dict()),
+      # edge_attrs = get(attrs, :edge, Dict()),
+    )
+end
+
 # DataFabric
 struct Log
     time::DateTime
@@ -125,8 +150,11 @@ end
 export reflect!
 
 # mutators 
-function add_source!(fabric::DataFabric, source::AbstractDataSource)
-    add_part!(fabric.graph, :V, label=nameof(source), value=source)
+function add_source!(fabric::DataFabric, source::AbstractDataSource, label=nameof(source))
+    out = add_part!(fabric.graph, :V, label=label, value=source)
+    # TODO reflect should be incremental. could consume the `add_part!` id
+    reflect!(fabric)
+    out
 end
 export add_source!
 
@@ -137,8 +165,10 @@ export add_table!
 
 function add_fk!(fabric::DataFabric, src::Int, tgt::Int, elabel::Pair{Symbol, Symbol})
     add_part!(fabric.graph, :E, src=src, tgt=tgt, edgelabel=elabel)
+    reflect!(fabric)
 end
 export add_fk!
+
 
 # Executing commands on data fabric
 
