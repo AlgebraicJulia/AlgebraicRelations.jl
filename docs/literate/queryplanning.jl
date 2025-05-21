@@ -1,5 +1,5 @@
 using ACSets
-using Catlab, Catlab.Graphics.Graphviz
+using Catlab
 using AlgebraicRelations
 using SQLite, DBInterface
 
@@ -90,10 +90,6 @@ add_fk!(fabric, winefood_src, winemaker_src, :WineFood!wine => :Winemaker!Winema
 
 # data
 add_part!(fabric, :WineFood, food=FK{Food}(1), wine=FK{Wine}(1))
-
-
-view_graphviz(to_graphviz(fabric.graph))
-
 # TODO does not guard against constraint
 
 execute!(winemaker_db, "select * from Winemaker")
