@@ -1,18 +1,18 @@
 using AlgebraicRelations
 
-using JSON3, Gumbo, HTTP
 
 axolotl = WebAPI(conn="https://theaxolotlapi.netlify.app/")
 
 subpart(axolotl)
 
-
 randomgenres = WebAPI(conn="https://binaryjazz.us/wp-json/genrenator/v1/genre/")
 
-subpart(randomgenres)
+subpart(randomgenres; path="*.2.1.:text")
 
 # TODO store in WebAPI DS
 access_token = ENV["JULIA_OMOP_API_KEY"]
+
+using JSON3, Gumbo, HTTP
 
 metadata = HTTP.request("GET", "https://redivis.com/api/v1/datasets/Demo.cms_synthetic_patient_data_omop", Dict("authorization" => "Bearer $access_token", "accept" => "application/json;odata=verbse",))
 
