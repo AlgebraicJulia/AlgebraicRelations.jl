@@ -272,12 +272,14 @@ include("queryplanning.jl")
 
 include("datasources/database/DatabaseDS.jl")
 include("datasources/inmemory/InMemoryDS.jl")
+include("datasources/webapi/WebApiDS.jl")
 
 # Custom show methods for Fabric objects
 include("show.jl")
 
 @reexport using .DatabaseDS
 @reexport using .InMemoryDS
+@reexport using .WebAPIDS
 
 
 end
