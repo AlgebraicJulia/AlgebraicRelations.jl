@@ -27,4 +27,6 @@ function Fabric.reconnect!(::WebAPI) end
 function Fabric.execute!(webapi::WebAPI, stmt::AbstractString; formatter=nothing)
 end
 
+include("acset_interface.jl")
+
 end
