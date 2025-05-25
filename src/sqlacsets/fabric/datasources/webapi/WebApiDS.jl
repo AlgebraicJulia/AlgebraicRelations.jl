@@ -9,13 +9,17 @@ using Gumbo # HTML Parsing
 
 @kwdef struct WebAPI <: AbstractDataSource
     conn::String # HTTP endpoint
+    token_envar::Union{String, Nothing} = nothing # TODO best way to store secrets?
     log::Vector{Log} = Log[]
 end
 export WebAPI
 
-# y = WebAPI(conn="https://theaxolotlapi.netlify.app/")
-
-# resp = HTTP.request("GET", yy.conn)
+function build_headers(web::WebAPI)
+    if !isnothing(web.token_envar)
+        Dict("authorization" => "Bearer $(ENV[web.token_envar])", 
+             "accept" => "application/json;odata=verbse")
+    end
+end
 
 # objects are endpoints
 # attrs are query params

@@ -1,6 +1,5 @@
 using AlgebraicRelations
 
-
 axolotl = WebAPI(conn="https://theaxolotlapi.netlify.app/")
 
 subpart(axolotl)
@@ -10,32 +9,24 @@ randomgenres = WebAPI(conn="https://binaryjazz.us/wp-json/genrenator/v1/genre/")
 subpart(randomgenres; path="*.2.1.:text")
 
 # TODO store in WebAPI DS
-access_token = ENV["JULIA_OMOP_API_KEY"]
+access_token = ENV["JULIA_OMOP_API_KEY"];
 
 using JSON3, Gumbo, HTTP
 
 metadata = HTTP.request("GET", "https://redivis.com/api/v1/datasets/Demo.cms_synthetic_patient_data_omop", Dict("authorization" => "Bearer $access_token", "accept" => "application/json;odata=verbse",))
 
 # list of "objects"
-tables = HTTP.request("GET", "https://redivis.com/api/v1/datasets/Demo.cms_synthetic_patient_data_omop/tables", Dict("authorization" => "Bearer $access_token", "accept" => "application/json;odata=verbse",))
 
-parsed_tables = parsehtml(String(tables.body))
-JSON3.read(parsed_tables.root.children[2].children[1].text)
+tableconn = WebAPI(conn="https://redivis.com/api/v1/datasets/Demo.cms_synthetic_patient_data_omop/tables", token_envar="JULIA_OMOP_API_KEY")
+
+tables = subpart(tableconn; path="*.2.1.:text", formatter=JSON3.read)
 
 table = "care_site"
-query = HTTP.request("GET", "https://redivis.com/api/v1/tables/Demo.cms_synthetic_patient_data_omop.$table/rows?format=jsonl", Dict(
-    "authorization" => "Bearer $(access_token)",
-    "accept" => "application/json;odata=verbose",
-  ))
 
-@assert query.status == 200
+queryconn = WebAPI(conn="https://redivis.com/api/v1/tables/Demo.cms_synthetic_patient_data_omop.$table/rows?format=jsonl")
 
-data = parsehtml(String(query.body))
-
-rows = data.root.children[2].children
-
-splitrows = split(rows[1].text, "\n")
-parsed = JSON3.read.(splitrows)
+# cacheing queries. if 
+subpart(queryconn, Dict("authorization" => "Bearer $access_token", "accept" => "application/json;odata=verbse",); path="*.2.1.:text") |> Base.Fix2(split, "\n") .|> JSON3.read
 
 struct Infer end
 
@@ -62,3 +53,14 @@ end
     ats = algrel_typeof.(values(parsed[1]))
     BasicSchema([gensym()], [], [ats], [attrs], [])
 # end
+
+using Catlab
+using ACSets
+
+p=@present SchTables(FreeSchema) begin
+    Value::AttrType
+    Table::Ob
+    (kind, id, qualifiedReference, scopedReference, referenceId, uri, url, isSample, hash, isFileIndex, createdAt, updatedAt, description, numRows, numBytes, variableCount, uploadMergeStrategy)::Attr(Table, Value)
+end
+@acset_type _Table(SchTables)
+tables_acset = _Table{String}()
