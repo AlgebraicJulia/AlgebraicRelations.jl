@@ -44,12 +44,14 @@ function query(doc::HTMLDocument, path::String)
     query(doc, Accessors(path))
 end
 
-# returns HTML Document
-function ACSetInterface.subpart(web::WebAPI; path::String="", kws...)
-    response = HTTP.request("GET", web.conn, kws...)
+# its generally better to explicitly format the return value of the query, such as piping it through split+JSON3.read, but it may also be the case that we want a general format for how return data should be cached. 
+#
+function ACSetInterface.subpart(web::WebAPI, kws...; path::String="", formatter=identity)
+    headers = build_headers(web)
+    response = HTTP.request("GET", web.conn, headers, kws...)
     @assert response.status == 200
     parsed_doc = parsehtml(String(response.body))
-    query(parsed_doc, path)
+    query(parsed_doc, path) |> formatter
 end
 
 function ACSetInterface.incident(web::WebAPI, id, column::Union{Symbol, Nothing}=nothing)
@@ -59,7 +61,3 @@ end
 # HTTP.get(...) # select # subpart
 # HTTP.post(...) # insert
 # HTTP.put(...) # upsert
-# HTTP.delete(...)
-# HTTP.patch(...) #
-# HTTP.head(...)
-
