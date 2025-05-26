@@ -90,20 +90,24 @@ function ACSetInterface.subpart(fabric::DataFabric, columns::Vector{Symbol})
     subpart(fabric, :, columns)
 end
 
-function ACSetInterface.subpart(fabric::DataFabric, id=(:), columns::Vector{Symbol}=[])
-    reduce((new_id, column) -> subpart(fabric, new_id, column), columns; init=id)
+# TODO wrap in datA frame here
+function ACSetInterface.subpart(fabric::DataFabric, id=(:), columns::Vector{Symbol}=[]; formatter=identity)
+    out = reduce((new_id, column) -> subpart(fabric, new_id, column), columns; init=id)
+    formatter(out)
 end
 
-function ACSetInterface.incident(fabric::DataFabric, id, column::Symbol)
+function ACSetInterface.incident(fabric::DataFabric, id, column::Symbol; formatter=identity)
     # TODO could be multiple
     source = decide_source(fabric, :cname => column)
     _, table = get_table(column)(fabric.catalog) |> only
-    incident(source, id, only(table) => column)
+    out = incident(source, id, only(table) => column)
+    formatter(out)
 end
 export incident
 
-function ACSetInterface.incident(fabric::DataFabric, id, columns::Vector{Symbol})
-    reduce((new_id, column) -> incident(fabric, new_id, column), columns; init=id)
+function ACSetInterface.incident(fabric::DataFabric, id, columns::Vector{Symbol}; formatter=identity)
+    out = reduce((new_id, column) -> incident(fabric, new_id, column), columns; init=id)
+    formatter(out)
 end
 
 function ACSetInterface.incident(fabric::DataFabric, value, tablecol::Tuple{Symbol, Symbol})

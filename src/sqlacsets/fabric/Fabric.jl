@@ -14,7 +14,7 @@ using Catlab
 using Catlab.Graphics.Graphviz
 using ACSets
 
-using MLStyle: @match
+using MLStyle: @match, @as_record
 using Dates
 using DataFrames
 using DBInterface
@@ -31,7 +31,7 @@ struct PK end
 export PK
 
 # foreign key wrapper
-struct FK{T<:ACSet} 
+@as_record struct FK{T<:ACSet} 
     val
 end
 export FK

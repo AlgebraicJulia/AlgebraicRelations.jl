@@ -3,9 +3,9 @@
 # ####################
 
 # get the number of rows
-function ACSetInterface.nparts(db::DBSource, table::Symbol)
+function ACSetInterface.nparts(db::DBSource, table::Symbol; formatter=identity)
     query = From(table) |> Group() |> Select(Agg.count())
-    DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
+    DBInterface.execute(db.conn, query) |> DataFrames.DataFrame |> Base.Fix2(getproperty, :count) |> only
 end
 
 function ACSetInterface.maxpart(db::DBSource, table::Symbol) 

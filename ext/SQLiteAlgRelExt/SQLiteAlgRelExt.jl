@@ -48,15 +48,17 @@ export create
 # to_sql(::DBSource{SQLite.DB}, x) = x
 
 function AlgebraicRelations.SQLACSets.Fabric.to_sql(::DBSource{SQLite.DB}, t)
-    @match t begin
+    _to_sql = @λ begin
         ::Type{<:Real} => "REAL"
         ::Type{<:Integer} => "INTEGER"
         ::Type{<:FK} => "INTEGER" # TODO foreign key
         ::Type{<:Union{AbstractString, Char, Symbol}} => "TEXT"
         ::Nothing => "NULL"
-        ::Symbol || ::AbstractString => "\'$t\'"
-        _ => t
+        s::Symbol || ::AbstractString => "\'$s\'"
+        FK{T}(id) where T => _to_sql(id)
+        s => s 
     end
+    _to_sql(t)
 end
 
 function AlgebraicRelations.SQLACSets.Fabric.from_sql(::DBSource{SQLite.DB}, s::String)
