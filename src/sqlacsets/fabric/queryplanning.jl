@@ -83,6 +83,55 @@ end
 # ports are columns of a table
 # boxes are tables ~ labels
 
+for v in parts(diag, :Junction)
+    @info incident(diag, v, :junction)
+end
+
+
+function to_graph(el::Elements)
+  F = FinFunctor(Dict(:V => :El, :E => :Arr), Dict(:src => :src, :tgt => :tgt),
+                 SchGraph, SchElements)
+  ΔF = DataMigrationFunctor(F, Elements{Symbol}, Graph)
+  return ΔF(el)
+end
+
+"""Enumerate all paths of an acyclic graph, indexed by src+tgt"""
+function enumerate_paths(diagram::UntypedNamedRelationDiagram;
+                         sorted::Union{AbstractVector{Int},Nothing}=nothing
+                        )::ReflexiveEdgePropertyGraph{Vector{Int}}
+  
+  el = elements(diag)
+  G = to_graph(el)
+
+  sorted = topological_sort(G)
+  
+  _Path = Vector{Int}
+
+  paths = [Set{_Path}() for _ in 1:nv(G)] # paths that start on a particular V
+  for v in reverse(sorted)
+    push!(paths[v], Int[]) # add length 0 paths
+    for e in incident(G, v, :src)
+      push!(paths[v], [e]) # add length 1 paths
+      for p in paths[G[e, :tgt]] # add length >1 paths
+        push!(paths[v], vcat([e], p))
+      end
+    end
+  end
+
+  # Initialize output data structure with empty paths
+  res = @acset ReflexiveEdgePropertyGraph{Path} begin
+    V=nv(G); E=nv(G); src=1:nv(G); tgt=1:nv(G); refl=1:nv(G)
+    eprops=[Int[] for _ in 1:nv(G)]
+  end
+  for (src, ps) in enumerate(paths)
+    for p in filter(x->!isempty(x), ps)
+      add_part!(res, :E; src=src, tgt=G[p[end],:tgt], eprops=p)
+    end
+  end
+  return res
+end
+
+
 
 # TODO add const
 mutable struct QueryRopeGraph
@@ -95,6 +144,7 @@ mutable struct QueryRopeGraph
         paths = []
         arity = OrderedDict(map(reverse(diagram[:variable])) do var
             let boxes = diagram[incident(diagram, var, [:junction, :variable]), :box]
+                @info boxes
                 @match length(boxes) begin
                     1 => push!(inputs, boxes)
                     2 => push!(paths, boxes)
@@ -107,7 +157,63 @@ mutable struct QueryRopeGraph
     end
 end
 
-diagram = @relation (winemaker=winemaker) begin
+
+function getpath(diag, port_name::Symbol)
+
+end
+
+i(n,x) = incident(diag,n,x)
+s(n,x) = subpart(diag,n,x) |> only
+
+# ## STEP 1
+# i1 = i(8, :junction) # [13]
+# w1 = s(i1, :box) # 6
+# ## STEP 2
+# i2 = i(w1, :box) # [12,13]
+# w2 = s(i2[i2 .∉ Ref(i1)], :junction) # 7
+# i3 = i(w2, :junction) # [11,12]
+# w3 = s(i3[i3 .∉ Ref(i2)], :box) # 5
+# i4 = i(w3, :box) # [10,11]
+# w4 = s(i4[i4 .∉ Ref(i3)], :junction) # 2
+# i5 = i(w4, :junction) # [1,10]
+# w5 = s(i5[i5 .∉ Ref(i4)], :box) # 1
+
+idx = 2
+ports = []
+ivars = [i(8, :junction)]
+subparts = [s(ivars[1], :box)]
+while :winemaker ∉ subpart(diag, ivars[end], :port_name)
+    cols = iseven(idx) ? (:box, :junction) : (:junction, :box)
+    i_idx = i(subparts[end], cols[1])
+    port_idx = i_idx[i_idx .∉ Ref(ivars[end])]
+    subpart_idx = s(port_idx, cols[2])
+    push!(ivars, i_idx)
+    push!(subparts, subpart_idx)
+    push!(ports, port_idx)
+    idx += 1
+end
+
+#     id = i(acc[end], cols[2])
+#     i
+#     s(i(acc[end], cols[1])[i(acc, cols[1]) .∉ Ref(ids[end])], cols[2])
+
+# all_results[1] is w2, all_results[2] is w3, etc.
+w2, w3, w4 = all_results[1:3]
+w5 = all_results[end] 
+
+# get input port
+input_port = incident(diag, :color, :port_name) |> only # [13]
+input_box = diag[input_port, :box] |> only # [6]
+# get box
+ports_on_box = incident(diag, input_box, :box) # [12,13]
+# get junction associated to 12
+new_junction = diag[ports_on_box[ports_on_box .!= input_box], :junction] # [7,8] 
+
+foreach(diag[:junction], diag[:box]) do j, b
+    @info (j,b)
+end
+
+diag = @relation (winemaker=winemaker) begin
     WineWinemaker(wine=wine, winemaker=winemaker_id)
     Winemaker(id=winemaker_id, region=region, winemaker=winemaker)
     CountryClimate(id=region, country=country_id)
@@ -116,9 +222,9 @@ diagram = @relation (winemaker=winemaker) begin
     Grape(id=grape, color=color)
 end
 
-view_graphviz(to_graphviz(diagram))
+view_graphviz(to_graphviz(diag))
 
-q=QueryRopeGraph(diagram)
+q=QueryRopeGraph(diag)
 
 d=Dict(:country=>:Italy, :color=>:Red)
 
