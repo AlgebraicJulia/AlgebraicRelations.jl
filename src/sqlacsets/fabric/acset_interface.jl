@@ -105,6 +105,7 @@ function ACSetInterface.incident(fabric::DataFabric, id, column::Symbol; formatt
 end
 export incident
 
+# TODO does not work with DataStore
 function ACSetInterface.incident(fabric::DataFabric, id, columns::Vector{Symbol}; formatter=identity)
     out = reduce((new_id, column) -> incident(fabric, new_id, column), columns; init=id)
     formatter(out)

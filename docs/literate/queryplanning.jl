@@ -3,7 +3,7 @@ using Catlab
 using AlgebraicRelations
 using SQLite, DBInterface
 
-include("examples/wineries.jl")
+include("examples/wineries.jl");
 
 # TODO add the Join statement to track the first where
 q = From(:Winemaker) |> Where([:Winemaker, :country_code], ==, [:Country, :id]) |>
@@ -14,6 +14,17 @@ execute!(fabric, q)
 
 view_graphviz(to_graphviz(fabric.graph))
 
+diag = @relation (winemaker_name=winemaker_name) begin
+    WineWinemaker(wine=wine, winemaker=winemaker_id)
+    Winemaker(id=winemaker_id, region=region, winemaker=winemaker_name)
+    CountryClimate(id=region, country=country_id)
+    Country(id=country_id, country=name)
+    Wine(id=wine, grape=grape)
+    Grape(id=grape, color=color)
+end
+
+q = QueryRopeGraph(diag)
+
 # execute!(fabric,
 # """
 # from Winemaker w
@@ -23,10 +34,24 @@ view_graphviz(to_graphviz(fabric.graph))
 # select w.winemaker
 # """)
 
-diagram = @relation (country_id=country_id) begin
-    Winemaker(country_code=country_id)
-    Country(id=country_id, country=country, climate=climate)
-    Grape(species=species, country=country)
+using Catlab.WiringDiagrams.RelationDiagrams: UntypedNamedRelationDiagram
+
+
+function Catlab.query(fabric::DataFabric, diagram::UntypedNamedRelatedDiagram, params=(;))
+    rope = QueryRopeGraph(diagram)
+end
+
+function Base.empty(fabric::DataFabric)
+    typ = typeof(fabric.graph)()
+end
+
+function Base.similar(fabric::DataFabric)
+    out = Base.empty(fabric)
+    @info out
+    foreach(objects(acset_schema(out))) do ob
+        add_parts!(out, ob, length(parts(out, ob)))
+    end
+    out
 end
 
 view_graphviz(to_graphviz(diagram))

@@ -29,12 +29,6 @@ function TableConds(q::ACSets.Query.ACSetSQLNode)
 end
 ## render to 
 
-d = execute!(q)
-
-# TODO have table alias
-function render(source::DBSource{SQLite.DB}, wc::WhereCondition)
-    "$(wc.lhs[1]).$(wc.lhs[2]) = $(to_sql(source, wc.rhs))"
-end
 
 function ACSetInterface.incident(fabric::DataFabric, wc::WhereCondition)
     incident(fabric, Symbol(wc.rhs), wc.lhs[2])
@@ -78,206 +72,83 @@ function Fabric.execute!(fabric::DataFabric, q::ACSets.Query.ACSetSQLNode)
     # select the RHS.col where the ids agree
 end
 
-# junctions are joins
-# outer ports are variables
-# ports are columns of a table
-# boxes are tables ~ labels
-
-for v in parts(diag, :Junction)
-    @info incident(diag, v, :junction)
-end
-
-
-function to_graph(el::Elements)
-  F = FinFunctor(Dict(:V => :El, :E => :Arr), Dict(:src => :src, :tgt => :tgt),
-                 SchGraph, SchElements)
-  ΔF = DataMigrationFunctor(F, Elements{Symbol}, Graph)
-  return ΔF(el)
-end
-
-"""Enumerate all paths of an acyclic graph, indexed by src+tgt"""
-function enumerate_paths(diagram::UntypedNamedRelationDiagram;
-                         sorted::Union{AbstractVector{Int},Nothing}=nothing
-                        )::ReflexiveEdgePropertyGraph{Vector{Int}}
-  
-  el = elements(diag)
-  G = to_graph(el)
-
-  sorted = topological_sort(G)
-  
-  _Path = Vector{Int}
-
-  paths = [Set{_Path}() for _ in 1:nv(G)] # paths that start on a particular V
-  for v in reverse(sorted)
-    push!(paths[v], Int[]) # add length 0 paths
-    for e in incident(G, v, :src)
-      push!(paths[v], [e]) # add length 1 paths
-      for p in paths[G[e, :tgt]] # add length >1 paths
-        push!(paths[v], vcat([e], p))
-      end
+function getpath(diag, junction_name::Symbol, input::Int)
+    i(n,x) = incident(diag,n,x)
+    s(n,x) = begin
+        out = subpart(diag,n,x)
+        out |> only
     end
-  end
-
-  # Initialize output data structure with empty paths
-  res = @acset ReflexiveEdgePropertyGraph{Path} begin
-    V=nv(G); E=nv(G); src=1:nv(G); tgt=1:nv(G); refl=1:nv(G)
-    eprops=[Int[] for _ in 1:nv(G)]
-  end
-  for (src, ps) in enumerate(paths)
-    for p in filter(x->!isempty(x), ps)
-      add_part!(res, :E; src=src, tgt=G[p[end],:tgt], eprops=p)
+    idx = 2
+    ports = Int[]
+    ivars = [i(input, :junction)]
+    subparts = [input, s(ivars[1], :box)]
+    boxes = [subparts[end]]
+    junction_spans = []
+    while junction_name ∉ subpart(diag, subpart(diag, ivars[end], :junction), :variable)
+        cols = iseven(idx) ? (:box, :junction) : (:junction, :box)
+        i_idx = i(subparts[end], cols[1])
+        if cols[1] == :junction
+            push!(junction_spans, subparts[end] => i_idx)
+        end
+        port_idx = i_idx[i_idx .∉ Ref(ivars[end])]
+        junction_name ∈ subpart(diag, subpart(diag, i_idx, :junction), :variable) && break
+        subpart_idx = s(port_idx, cols[2])
+        if cols[2] == :box
+            push!(boxes, subpart_idx)
+        end
+        push!(ivars, i_idx)
+        push!(subparts, subpart_idx)
+        push!(ports, only(port_idx))
+        idx += 1
     end
-  end
-  return res
+    (ports=ports, ivars=ivars, subparts=subparts, boxes=boxes, junction_spans=junction_spans)
 end
 
+function getpath(diag, junction_name::Symbol, input::Symbol)
+    junct_id = incident(diag, input, :variable)
+    getpath(diag, junction_name, first(junct_id))
+end
 
-
-# TODO add const
 mutable struct QueryRopeGraph
-    const inputs::Vector{Vector{Int}}
-    const paths::Vector{Vector{Int}}
+    const inputs::Vector{Int}
+    const paths::Dict{Symbol, Any}
     const arity::OrderedDict{Vector{Int}, Symbol}
     data::Dict{Int,Any}
     function QueryRopeGraph(diagram::UntypedNamedRelationDiagram)
-        inputs = []
-        paths = []
+        inputs = Int[]
         arity = OrderedDict(map(reverse(diagram[:variable])) do var
             let boxes = diagram[incident(diagram, var, [:junction, :variable]), :box]
-                @info boxes
-                @match length(boxes) begin
-                    1 => push!(inputs, boxes)
-                    2 => push!(paths, boxes)
-                    _ => nothing
+                if length(boxes) == 1
+                    let junct_id = first(incident(diagram, var, :variable))
+                        if isempty(incident(diagram, junct_id, :outer_junction))
+                            push!(inputs, first(incident(diagram, var, :variable)))
+                        end
+                    end
                 end
                 boxes => var
             end
         end)
+        paths = Dict([diagram[input, :variable] => getpath(diagram, :winemaker_name, input) for input in inputs])
         new(inputs, paths, arity, Dict{Int,Any}())
     end
 end
-
-
-function getpath(diag, port_name::Symbol)
-
-end
-
-i(n,x) = incident(diag,n,x)
-s(n,x) = subpart(diag,n,x) |> only
-
-# ## STEP 1
-# i1 = i(8, :junction) # [13]
-# w1 = s(i1, :box) # 6
-# ## STEP 2
-# i2 = i(w1, :box) # [12,13]
-# w2 = s(i2[i2 .∉ Ref(i1)], :junction) # 7
-# i3 = i(w2, :junction) # [11,12]
-# w3 = s(i3[i3 .∉ Ref(i2)], :box) # 5
-# i4 = i(w3, :box) # [10,11]
-# w4 = s(i4[i4 .∉ Ref(i3)], :junction) # 2
-# i5 = i(w4, :junction) # [1,10]
-# w5 = s(i5[i5 .∉ Ref(i4)], :box) # 1
-
-idx = 2
-ports = []
-ivars = [i(8, :junction)]
-subparts = [s(ivars[1], :box)]
-while :winemaker ∉ subpart(diag, ivars[end], :port_name)
-    cols = iseven(idx) ? (:box, :junction) : (:junction, :box)
-    i_idx = i(subparts[end], cols[1])
-    port_idx = i_idx[i_idx .∉ Ref(ivars[end])]
-    subpart_idx = s(port_idx, cols[2])
-    push!(ivars, i_idx)
-    push!(subparts, subpart_idx)
-    push!(ports, port_idx)
-    idx += 1
-end
-
-#     id = i(acc[end], cols[2])
-#     i
-#     s(i(acc[end], cols[1])[i(acc, cols[1]) .∉ Ref(ids[end])], cols[2])
-
-# all_results[1] is w2, all_results[2] is w3, etc.
-w2, w3, w4 = all_results[1:3]
-w5 = all_results[end] 
-
-# get input port
-input_port = incident(diag, :color, :port_name) |> only # [13]
-input_box = diag[input_port, :box] |> only # [6]
-# get box
-ports_on_box = incident(diag, input_box, :box) # [12,13]
-# get junction associated to 12
-new_junction = diag[ports_on_box[ports_on_box .!= input_box], :junction] # [7,8] 
-
-foreach(diag[:junction], diag[:box]) do j, b
-    @info (j,b)
-end
-
-diag = @relation (winemaker=winemaker) begin
-    WineWinemaker(wine=wine, winemaker=winemaker_id)
-    Winemaker(id=winemaker_id, region=region, winemaker=winemaker)
-    CountryClimate(id=region, country=country_id)
-    Country(id=country_id, country=name)
-    Wine(id=wine, grape=grape)
-    Grape(id=grape, color=color)
-end
-
-view_graphviz(to_graphviz(diag))
-
-q=QueryRopeGraph(diag)
+export QueryRopeGraph
 
 d=Dict(:country=>:Italy, :color=>:Red)
 
-function Catlab.query(fabric::DataFabric, diagram::UntypedNamedRelatedDiagram, params=(;))
-    rope = QueryRopeGraph(diagram)
+# function Catlab.query(fabric::DataFabric, diagram::UntypedNamedRelatedDiagram, params=(;))
+#     rope = QueryRopeGraph(diagram)
    
-    # TODO
-    map([q.paths[1]]) do path
-        # first, apply σ or restriction
-        rhs=path[2]; lhs=path[1]
-        rhs=diagram[rhs,:name] => incident(fabric, d[q.arity[[rhs]]], q.arity[[rhs]])
-        lhs=diagram[lhs,:name] => incident(fabric, d[q.arity[[lhs]]], q.arity[[lhs]])
-        @info lhs, rhs
-    end
+#     # TODO
+#     map([q.paths[1]]) do path
+#         # first, apply σ or restriction
+#         rhs=path[2]; lhs=path[1]
+#         rhs=diagram[rhs,:name] => incident(fabric, d[q.arity[[rhs]]], q.arity[[rhs]])
+#         lhs=diagram[lhs,:name] => incident(fabric, d[q.arity[[lhs]]], q.arity[[lhs]])
+#         @info lhs, rhs
+#     end
 
-end
-
-
+# end
 
 
-    # TODO joins
-    map([q.paths[1]]) do path
-        # first, apply σ or restriction
-        rhs=path[2]; lhs=path[1]
-        rhs=r[rhs,:name] => incident(fabric, d[q.arity[[rhs]]], q.arity[[rhs]])
-        lhs=r[lhs,:name] => incident(fabric, d[q.arity[[lhs]]], q.arity[[lhs]])
-        @info lhs, rhs
-    end
 
-    function is_leaf(id::Int)
-        # get ports incident to this box
-        pts=incident(r, id, :box)
-        our_junctions=subpart(r, subpart(r, pts, :junction), :variable)
-        filter(our_junctions) do junct
-            length(arity[junct])!==1
-        end
-    end
-
-    # filter out ones which correspond to junctions with arity=1
-   
-    # subpart(r, pts, [:variable, :junction]) TODO does not work
-
-
-    #
-
-    boxes = Dict([
-
-                  # get the incide
-                  box => incident(r, box, :box) ∩ 
-
-    # a box is a "leaf" if only has one inner junction,
-    # if it has more than 1 its a branch
-
-    # 1. Grape(species=species)
-    # 2. Country(country=Grape#1.country, climate=climate)
-    # 3. Winemaker(country_id=Country#2.id) 
