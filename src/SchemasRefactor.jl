@@ -2,9 +2,12 @@ module SchemasRefactor
 
 using Catlab
 
+to_graphviz(AlgebraicRelations.Schemas.TheorySQLSchema, graph_attrs=Dict(:size=>"4.5",:ratio=>"expand"))
+to_graphviz(AlgebraicRelations.Fabric.SchERD, graph_attrs=Dict(:size=>"4.5",:ratio=>"expand"))
+
 """
 A schema to describe SQL schemas.
-Tables are what you would expect. Cols are the columns of a table, so they always know who they belong to col_of.
+`Table` is what you would expect. `Column` are the columns of a table, so they always know who they belong to col_of.
 PK is the primary key of a table pk_of. It needs a junction table PK_Cols because composite primary keys need
 to reference multiple columns of a table. FK are foreign keys, they take you from one table to a PK (of another table).
 Because the referenced primary key may be composite, the foreign key may also need to be composite, so there is a junction
@@ -18,31 +21,47 @@ how to enforce that.
 We set injective constraints (via `unique_index` when calling `@acset_type`) on the following homs:
   * `pk_of`: each primary key can only be the PK of a single table
 """
-@present TheorySQLSchema(FreeSchema) begin
-    (Tables,Cols,PK,PK_Cols,FK,FK_Cols)::Ob
-    col_of::Hom(Cols,Tables)
-    pk_col::Hom(PK_Cols,Cols)
-    pk::Hom(PK_Cols,PK)
-    pk_of::Hom(PK,Tables)
-    to::Hom(FK,PK)
-    from::Hom(FK,Tables)
-    fk::Hom(FK_Cols,FK)
-    fk_col::Hom(FK_Cols,Cols)
-    StrType::AttrType
-    tab_name::Attr(Tables,StrType)
-    col_name::Attr(Cols,StrType)
-    col_type::Attr(Cols,StrType)
-    compose(pk, pk_of) == compose(pk_col, col_of)
-    compose(fk_col, col_of) == compose(fk, from)
-    # compose(to, pk_of) != from
+@present TheorySQLSchemaRefactor(FreeSchema) begin
+  (Table, Column, PK, PK_Cols, FK, FK_Cols)::Ob
+  col_of::Hom(Column, Table)
+  pk_col::Hom(PK_Cols, Column)
+  pk::Hom(PK_Cols, PK)
+  pk_of::Hom(PK, Table)
+  to::Hom(FK, PK)
+  from::Hom(FK, Table)
+  fk::Hom(FK_Cols, FK)
+  fk_col::Hom(FK_Cols, Column)
+  Name::AttrType
+  tab_name::Attr(Table, Name)
+  col_name::Attr(Column, Name)
+  col_type::Attr(Column, Name)
+  compose(pk, pk_of) == compose(pk_col, col_of)
+  compose(fk_col, col_of) == compose(fk, from)
+  # compose(to, pk_of) != from
 end
 
-@abstract_acset_type AbstractSQLSchema
-@acset_type SQLSchema(
-    TheorySQLSchema, 
+to_graphviz(TheorySQLSchemaRefactor, graph_attrs=Dict(:size=>"4.5",:ratio=>"expand"))
+
+@abstract_acset_type AbstractSQLSchemaRefactor
+@acset_type SQLSchemaRefactor(
+    TheorySQLSchemaRefactor, 
     index=[:col_of, :pk_col, :pk, :to, :from, :fk, :fk_col], 
     unique_index=[:pk_of]
-) <: AbstractSQLSchema
+) <: AbstractSQLSchemaRefactor
 
+@present SchERDRefactor <: TheorySQLSchemaRefactor begin
+  Source::Ob
+  (Conn, SourceId)::AttrType
+  source::Hom(Table, Source)
+  source_id::Attr(Source, SourceId)
+  conn::Attr(Source, Conn)
+end
+
+to_graphviz(SchERDRefactor, graph_attrs=Dict(:size=>"4.5",:ratio=>"expand"))
+
+
+function to_graphviz_dot(sch::T) where {T<:AbstractSQLSchemaRefactor}
+  
+end 
 
 end
