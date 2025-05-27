@@ -6,13 +6,13 @@ using SQLite, DBInterface
 include("examples/wineries.jl");
 
 # TODO add the Join statement to track the first where
-q = From(:Winemaker) |> Where([:Winemaker, :country_code], ==, [:Country, :id]) |>
-                        Where([:Country, :country], ==, "France") |>
-                        Select(:Country!country)
+# q = From(:Winemaker) |> Where([:Winemaker, :country_code], ==, [:Country, :id]) |>
+#                         Where([:Country, :country], ==, "France") |>
+#                         Select(:Country!country)
 
-execute!(fabric, q)
+# execute!(fabric, q)
 
-view_graphviz(to_graphviz(fabric.graph))
+# view_graphviz(to_graphviz(fabric.graph))
 
 diag = @relation (winemaker_name=winemaker_name) begin
     WineWinemaker(wine=wine, winemaker=winemaker_id)
@@ -20,7 +20,7 @@ diag = @relation (winemaker_name=winemaker_name) begin
     CountryClimate(id=region, country=country_id)
     Country(id=country_id, country=name)
     Wine(id=wine, grape=grape)
-    Grape(id=grape, color=color)
+    Grape(id=grape, color=color, species=species)
 end
 
 q = QueryRopeGraph(diag)

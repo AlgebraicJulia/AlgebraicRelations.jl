@@ -72,6 +72,15 @@ function Fabric.execute!(fabric::DataFabric, q::ACSets.Query.ACSetSQLNode)
     # select the RHS.col where the ids agree
 end
 
+function neighboring_boxes(diag::UntypedNamedRelationDiagram, b::Int64)
+    
+end
+
+# function getpath(diag, box::Int)
+#     i(n, x) = incident(diag, n, x)
+#     i(
+# end
+
 function getpath(diag, junction_name::Symbol, input::Int)
     i(n,x) = incident(diag,n,x)
     s(n,x) = begin
