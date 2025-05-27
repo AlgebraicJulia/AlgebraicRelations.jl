@@ -2,6 +2,7 @@ using ACSets
 using Catlab
 using AlgebraicRelations
 using SQLite, DBInterface
+using Catlab.WiringDiagrams.RelationDiagrams: UntypedNamedRelationDiagram
 
 include("examples/wineries.jl");
 
@@ -24,6 +25,61 @@ diag = @relation (winemaker_name=winemaker_name) begin
 end
 
 q = QueryRopeGraph(diag)
+
+function arity(diag::UntypedNamedRelationDiagram, j::Int)
+    length(incident(diag, j, :junction))
+end
+
+
+function box_junctions(diag::UntypedNamedRelationDiagram, b::Int)
+    diag[incident(diag, b, :box), :junction]
+end
+
+function neighboring_boxes(diag::UntypedNamedRelationDiagram, b::Int, path::Vector{Int})
+    junctions_of_box_id = box_junctions(diag, b) # 7, 8, 9
+    neighbor = setdiff(diag[vcat(incident(diag, junctions_of_box_id, :junction)...), :box], b)
+    setdiff(neighbor, path)
+end
+
+struct PairIterator{T}; data::Vector{T} end
+function Base.iterate(iter::PairIterator, state::Int=1)
+    if state < length(iter.data)
+        ((iter.data[state], iter.data[state+1]), state+1) 
+    end
+end
+Base.IteratorSize(::Type{PairIterator}) = Base.HasLength()
+Base.length(iter::PairIterator) = max(0, length(iter.data) - 1)
+
+function boxpath(diag::UntypedNamedRelationDiagram, start::Int, stop::Int)
+    keep_on = true
+    path = Int[start]
+    boxes = [start]
+    while keep_on
+        isempty(boxes) && break
+        res, = neighboring_boxes.(Ref(diag), boxes, Ref(path))
+        union!(path, res)
+        boxes = res
+        if stop ∈ res
+            break
+        end
+    end
+    PairIterator(path)
+end
+
+map(boxpath(diag, 6, 2)) do (l, r)
+    # box
+    diag[l, :name]
+    # params
+    js = box_junctions(diag, l)
+    params = js[arity.(Ref(diag), js) .== 1]
+end
+
+# incident on DB + InMemory (ACSet)
+v1 = incident(fabric, :Graph; color=:Red, species=:RedGrape) 
+
+v2 = incident(fabric, :Wine; grape=v1)
+v3 = incident(fabric, 
+
 
 # execute!(fabric,
 # """
