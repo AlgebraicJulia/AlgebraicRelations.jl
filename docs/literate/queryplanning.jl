@@ -24,6 +24,53 @@ diag = @relation (winemaker_name=winemaker_name) begin
     Grape(id=grape, color=color, species=species)
 end
 
+# look at the UWD in question
+to_graphviz(diag, box_labels=true, junction_labels=:variable)
+
+# helpful to have the Schema visualized when doing lots of subpart/incident
+to_graphviz(Presentation(acset_schema(diag)), graph_attrs=Dict(:size=>"5", :ratio=>"expand"))
+
+# ------------------------------
+# incident along multiple homs
+
+# the type for `f` is a bit complex but it lets us handle (:f, (a:, :b)) to do multi-indexing
+# on paths of different lengths for each leg in the (multi)spans
+function incident_multi(acs, parts, f::T) where{T<:Tuple{Vararg{Union{Symbol, Tuple{Vararg{Symbol}}}}}}
+    return intersect([incident(acs, parts[i], f[i]) for i in eachindex(f)]...)
+end
+
+@present SpanSch(FreeSchema) begin
+    (X,Y,Z)::Ob
+    Val::AttrType
+    x::Hom(Z,X)
+    y::Hom(Z,Y)
+    val::Attr(X,Val)
+end
+
+to_graphviz(SpanSch, graph_attrs=Dict(:size=>"4", :ratio=>"expand"))
+
+@acset_type SpanType(SpanSch, index=nameof.(generators(SpanSch, :Hom)))
+
+span_acs = @acset SpanType{Symbol} begin
+    Z=5
+    Y=3
+    X=3
+    x=[1,2,2,3,3]
+    val=[:a,:b,:b]
+    y=[3,3,2,2,1]
+end
+
+# manually, and doing it with `incident_multi`, they return the same
+intersect(
+    incident(span_acs, 3, :y),
+    incident(span_acs, :b, (:x, :val))
+)
+
+incident_multi(span_acs, (3, :b), (:y, (:x, :val)))
+
+# end sean's section
+# ------------------------------
+
 q = QueryRopeGraph(diag)
 
 function arity(diag::UntypedNamedRelationDiagram, j::Int)
