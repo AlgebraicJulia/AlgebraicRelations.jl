@@ -68,4 +68,15 @@ function ACSetInterface.incident(m::InMemory, id, tablecolumn::Pair{Symbol, Symb
     incident(m.value, id, tablecolumn.second)
 end
 
+function ACSetInterface.incident(m::InMemory, id, column::Symbol; formatter=identity)
+    out = incident(m.value, id, column)
+    formatter(out)
+end
+
+function ACSetInterface.incident(m::InMemory, parts, f::T; formatter=identity) where {T<:Tuple{Vararg{Union{Symbol, Tuple{Vararg{Symbol}}}}}}
+    out = intersect([incident(m, parts[i], f[i]) for i in eachindex(f)]...)
+    formatter(out)
+end
+
+
 end

@@ -22,6 +22,7 @@ using FunSQL
 using FunSQL: reflect
 import FunSQL: render
 
+using StructEquality
 using Reexport
 
 function columntypes end
@@ -31,8 +32,9 @@ struct PK end
 export PK
 
 # foreign key wrapper
-@as_record struct FK{T<:ACSet} 
-    val
+# TODO as_record
+@struct_hash_equal struct FK{T<:ACSet} 
+    val::Int
 end
 export FK
 

@@ -6,6 +6,10 @@ using Catlab.WiringDiagrams.RelationDiagrams: UntypedNamedRelationDiagram
 
 include("examples/wineries.jl");
 
+incident(fabric, :GreenGrape, :species)
+
+incident(fabric, [(:Green, :color), (:GreenGrape, :species)])
+
 # TODO add the Join statement to track the first where
 # q = From(:Winemaker) |> Where([:Winemaker, :country_code], ==, [:Country, :id]) |>
 #                         Where([:Country, :country], ==, "France") |>
@@ -20,72 +24,37 @@ diag = @relation (winemaker_name=winemaker_name) begin
     Winemaker(id=winemaker_id, region=region, winemaker=winemaker_name)
     CountryClimate(id=region, country=country_id)
     Country(id=country_id, country=name)
-    Wine(id=wine, grape=grape)
+    Wine(id=wine, cultivar=grape)
     Grape(id=grape, color=color, species=species)
 end
 
 # look at the UWD in question
-to_graphviz(diag, box_labels=true, junction_labels=:variable)
+view_graphviz(to_graphviz(diag, box_labels=true, junction_labels=:variable))
 
 # helpful to have the Schema visualized when doing lots of subpart/incident
-to_graphviz(Presentation(acset_schema(diag)), graph_attrs=Dict(:size=>"5", :ratio=>"expand"))
+view_graphviz(to_graphviz(Presentation(acset_schema(diag)), graph_attrs=Dict(:size=>"5", :ratio=>"expand")))
 
-# ------------------------------
-# incident along multiple homs
+# q = QueryRopeGraph(diag)
 
-# the type for `f` is a bit complex but it lets us handle (:f, (a:, :b)) to do multi-indexing
-# on paths of different lengths for each leg in the (multi)spans
-function incident_multi(acs, parts, f::T) where{T<:Tuple{Vararg{Union{Symbol, Tuple{Vararg{Symbol}}}}}}
-    return intersect([incident(acs, parts[i], f[i]) for i in eachindex(f)]...)
+function arity(diag::UntypedNamedRelationDiagram, i::Int, label::Symbol=:junction)
+    length(incident(diag, i, label))
 end
-
-@present SpanSch(FreeSchema) begin
-    (X,Y,Z)::Ob
-    Val::AttrType
-    x::Hom(Z,X)
-    y::Hom(Z,Y)
-    val::Attr(X,Val)
-end
-
-to_graphviz(SpanSch, graph_attrs=Dict(:size=>"4", :ratio=>"expand"))
-
-@acset_type SpanType(SpanSch, index=nameof.(generators(SpanSch, :Hom)))
-
-span_acs = @acset SpanType{Symbol} begin
-    Z=5
-    Y=3
-    X=3
-    x=[1,2,2,3,3]
-    val=[:a,:b,:b]
-    y=[3,3,2,2,1]
-end
-
-# manually, and doing it with `incident_multi`, they return the same
-intersect(
-    incident(span_acs, 3, :y),
-    incident(span_acs, :b, (:x, :val))
-)
-
-incident_multi(span_acs, (3, :b), (:y, (:x, :val)))
-
-# end sean's section
-# ------------------------------
-
-q = QueryRopeGraph(diag)
-
-function arity(diag::UntypedNamedRelationDiagram, j::Int)
-    length(incident(diag, j, :junction))
-end
-
 
 function box_junctions(diag::UntypedNamedRelationDiagram, b::Int)
     diag[incident(diag, b, :box), :junction]
 end
 
-function neighboring_boxes(diag::UntypedNamedRelationDiagram, b::Int, path::Vector{Int})
+function neighboring_boxes(diag::UntypedNamedRelationDiagram, b::Int, path::Vector{Int}=Int[])
     junctions_of_box_id = box_junctions(diag, b) # 7, 8, 9
     neighbor = setdiff(diag[vcat(incident(diag, junctions_of_box_id, :junction)...), :box], b)
     setdiff(neighbor, path)
+end
+
+# this should in actuality check neighboring boxes
+function valence(diag::UntypedNamedRelationDiagram)
+    map(parts(diag, :Box)) do box
+        box => (arity=arity(diag, box, :box), neighbors=neighboring_boxes(diag, box))
+    end
 end
 
 struct PairIterator{T}; data::Vector{T} end
@@ -113,13 +82,38 @@ function boxpath(diag::UntypedNamedRelationDiagram, start::Int, stop::Int)
     PairIterator(path)
 end
 
-map(boxpath(diag, 6, 2)) do (l, r)
-    # box
-    diag[l, :name]
-    # params
-    js = box_junctions(diag, l)
-    params = js[arity.(Ref(diag), js) .== 1]
+params = Dict(:color => :Green, :species => :GreenGrape)
+
+incident(fabric, [(params[col], col) for col in [:color, :species]])
+
+
+get_box=@relation (variable=variable) begin
+    Junction(_id=Junction, variable=variable)
+    Port(box=left, junction=Junction)
+    Port(box=right, junction=Junction)
 end
+
+function query_boxes(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, left::Int, right::Int)
+    # box
+    box = diag[left, :name]
+    # params
+    js = box_junctions(diag, left)
+    _params = js[arity.(Ref(diag), js, Ref(:junction)) .== 1]
+    param_names = subpart(diag, _params, :variable)
+    #
+    result = incident(fabric, [(params[col], col) for col in param_names])
+    # which junction mediates 6, 5
+    _res = query(diag, get_box, (left=left, right=right))
+    _res.variable => result
+end
+
+# querying
+map(boxpath(diag, 6, 2)) do (l, r)
+    query_boxes(fabric, diag, l, r) # TODO this result will be a param for the previous 
+end
+
+incident(fabric, FK{Grape}(1), :cultivar)
+
 
 # incident on DB + InMemory (ACSet)
 v1 = incident(fabric, :Graph; color=:Red, species=:RedGrape) 

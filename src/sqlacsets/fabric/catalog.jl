@@ -50,11 +50,11 @@ function add_to_catalog!(catalog::Catalog, s::SQLSchema{T}; source=nothing, conn
     end
     foreach(subpart(s, :, :cname)) do column
         # get the id of the table
-        #
         sch_cid = incident(s, column, :cname)
         sch_tname = subpart(s, subpart(s, sch_cid, :table), :tname) |> only
         catalog_tid = incident(catalog, Symbol(sch_tname), :tname)
         ctype = coltype(column, types)
+        # TODO this throws an error if there are two columns that share a name
         @something emptyMaybe(incident(catalog, Symbol(column), :cname)) add_part!(catalog, :Column, table=only(catalog_tid), cname=Symbol(column), type=ctype)
     end
     foreach(parts(s, :FK)) do fk
@@ -75,3 +75,13 @@ function coltype(column::String, types::Union{Dict, Nothing}=nothing)
     occursin("_id", column) && return PK
     type = haskey(types, Symbol(column)) ? types[Symbol(column)] : Any
 end
+
+# function get_table(catalog::Catalog, columns::Union{Symbol,Vector{Symbol}})
+#     q = From(:Table=>:tname) |> 
+#           Where(:Table, From(:Column=>:table) |> 
+#                 Where(:cname,∈(ACSets.Query.iterable(columns))))
+#     res, = q(catalog)
+#     out, = res.second
+#     out
+# end
+

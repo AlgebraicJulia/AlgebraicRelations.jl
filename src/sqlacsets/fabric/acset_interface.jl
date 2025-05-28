@@ -3,7 +3,6 @@
 get_table(column) = From(:Table=>:tname)|>
                     Where(:Table, From(:Column=>:table)|>Where(:cname, column))
 
-# TODO refactor to use graph
 function decide_source(fabric::DataFabric, attr::Pair{Symbol, Tuple{Symbol, Symbol}})
     id = incident(fabric.catalog, attr.second[1], attr.first)
     source_id = subpart(fabric.catalog, only(id), :source)
@@ -49,11 +48,12 @@ export subpart
 #     nparts(fabric.graph
 # end
 
-function ACSetInterface.subpart(fabric::DataFabric, fks::Vector{FK{T}}, column::Symbol) where T
-    subpart(fabric, getproperty.(fks, :val), column)
+function ACSetInterface.subpart(fabric::DataFabric, fks::Vector{FK{T}}, column::Symbol; formatter=identity) where T
+    out = subpart(fabric, getproperty.(fks, :val), column)
+    formatter(out)
 end
 
-function ACSetInterface.subpart(fabric::DataFabric, id, column::Symbol)
+function ACSetInterface.subpart(fabric::DataFabric, id, column::Symbol; formatter=identity)
     column = if isempty(incident(fabric.catalog, column, :tname))
         column
     else
@@ -65,10 +65,11 @@ function ACSetInterface.subpart(fabric::DataFabric, id, column::Symbol)
     # TODO move handling of FK types to another method
     id = eltype(id) <: FK ? getproperty.(id, :val) : id
     subpart(source, id, table => column)
+    formatter(out)
 end
 
 # Winemaker => name
-function ACSetInterface.subpart(fabric::DataFabric, id, column::Pair{Symbol, Symbol})
+function ACSetInterface.subpart(fabric::DataFabric, id, column::Pair{Symbol, Symbol}; formatter=identity)
     # get columns
     columns = subpart(fabric.catalog, incident(fabric.catalog, column.first, [:table, :tname]), :cname)
     @assert !isempty(columns[columns .== column.second])
@@ -79,15 +80,18 @@ function ACSetInterface.subpart(fabric::DataFabric, id, column::Pair{Symbol, Sym
                              incident(fabric.catalog, column.first, :tname),
                              :source), 
                      :value)
-    subpart(only(source), id, column.second)
+    out = subpart(only(source), id, column.second)
+    formatter(out)
 end
 
-function ACSetInterface.subpart(fabric::DataFabric, column::Pair{Symbol, Symbol})
-    subpart(fabric, :, column)
+function ACSetInterface.subpart(fabric::DataFabric, column::Pair{Symbol, Symbol}; formatter=identity)
+    out = subpart(fabric, :, column)
+    formatter(out)
 end
 
-function ACSetInterface.subpart(fabric::DataFabric, columns::Vector{Symbol})
-    subpart(fabric, :, columns)
+function ACSetInterface.subpart(fabric::DataFabric, columns::Vector{Symbol}; formatter=identity)
+    out = subpart(fabric, :, columns)
+    formatter(out)
 end
 
 # TODO wrap in datA frame here
@@ -105,14 +109,25 @@ function ACSetInterface.incident(fabric::DataFabric, id, column::Symbol; formatt
 end
 export incident
 
+# incident(fabric, (3, :b), ([3,4], :c))
+function ACSetInterface.incident(fabric::DataFabric, kvs::Vector{Tuple{<:T, Symbol}}; formatter=identity) where T
+    ids = [incident(fabric, val, col; formatter=identity) for (val,col) in kvs]
+    isempty(ids) && return []
+    out = intersect(ids...)
+    # TODO if a result is a DataFrame, then we have have an issue
+    formatter(out)
+end
+# TODO returns ids of matching rows
+
 # TODO does not work with DataStore
 function ACSetInterface.incident(fabric::DataFabric, id, columns::Vector{Symbol}; formatter=identity)
     out = reduce((new_id, column) -> incident(fabric, new_id, column), columns; init=id)
     formatter(out)
 end
 
-function ACSetInterface.incident(fabric::DataFabric, value, tablecol::Tuple{Symbol, Symbol})
+function ACSetInterface.incident(fabric::DataFabric, value, tablecol::Tuple{Symbol, Symbol}; formatter=identity)
     source = decide_source(fabric, :tname => tablecol)
-    incident(source, value, tablecol[2])
+    out = incident(source, value, tablecol[2])
+    formatter(out)
 end
 

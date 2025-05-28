@@ -87,25 +87,25 @@ add_part!(fabric, :CountryClimate, country=FK{Country}(1), climate=FK{Climate}(2
 @present SchWine(FreeSchema) begin
     (Name, Price, Grape)::AttrType
     Wine::Ob
-    grape::Attr(Wine, Grape)
+    cultivar::Attr(Wine, Grape)
     (type, name)::Attr(Wine, Name)
 end
 @acset_type Wine(SchWine)
 wine = InMemory(Wine{Symbol, Int, FK{Grape}}())
 wine_src = add_source!(fabric, wine)
-add_fk!(fabric, wine_src, grape_src, :Wine!grape => :Grape!Grape_id)
+add_fk!(fabric, wine_src, grape_src, :Wine!cultivar => :Grape!Grape_id)
 
 # data
-add_part!(fabric, :Wine, type=:white, grape=FK{Grape}(1), name=:Chardonnay) # Sicily
-add_part!(fabric, :Wine, type=:red, grape=FK{Grape}(1), name=:NeroDAvola) # Sicily
-add_part!(fabric, :Wine, type=:fortified, grape=FK{Grape}(1), name=:Marsala) # Sicily
-add_part!(fabric, :Wine, type=:red, grape=FK{Grape}(1), name=:Gaglioppo) # Calabria
-add_part!(fabric, :Wine, type=:white, grape=FK{Grape}(1), name=:GrecoBianco) # Calabria
-add_part!(fabric, :Wine, type=:red, grape=FK{Grape}(1), name=:Sangiovese) # Puglia and Tuscany
-add_part!(fabric, :Wine, type=:red, grape=FK{Grape}(1), name=:Montepulciano) # Puglia
-add_part!(fabric, :Wine, type=:white, grape=FK{Grape}(1), name=:Trebbiano) # Puglia and Tuscany
-add_part!(fabric, :Wine, type=:red, grape=FK{Grape}(1), name=:Nebbiolo) # Piedmont
-add_part!(fabric, :Wine, type=:white, grape=FK{Grape}(1), name=:MoscatoDAsti) # Piedmont
+add_part!(fabric, :Wine, type=:white, cultivar=FK{Grape}(1), name=:Chardonnay) # Sicily
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(1), name=:NeroDAvola) # Sicily
+add_part!(fabric, :Wine, type=:fortified, cultivar=FK{Grape}(1), name=:Marsala) # Sicily
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(1), name=:Gaglioppo) # Calabria
+add_part!(fabric, :Wine, type=:white, cultivar=FK{Grape}(1), name=:GrecoBianco) # Calabria
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(1), name=:Sangiovese) # Puglia and Tuscany
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(1), name=:Montepulciano) # Puglia
+add_part!(fabric, :Wine, type=:white, cultivar=FK{Grape}(1), name=:Trebbiano) # Puglia and Tuscany
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(1), name=:Nebbiolo) # Piedmont
+add_part!(fabric, :Wine, type=:white, cultivar=FK{Grape}(1), name=:MoscatoDAsti) # Piedmont
 
 @present SchWinemaker(FreeSchema) begin
     (Name, Region)::AttrType
@@ -117,6 +117,7 @@ end
 @acset_type Winemaker(SchWinemaker)
 winemakers = Winemaker{Symbol, FK{CountryClimate}}()
 winemaker_db = DBSource(SQLite.DB(), acset_schema(winemakers))
+
 # load table
 import FunSQL: render
 execute!(winemaker_db, render(winemaker_db, winemakers))
@@ -200,4 +201,4 @@ add_part!(fabric, :WineFood, food=FK{Food}(1), wine=FK{Wine}(1))
 # TODO need to specify where 
 # execute!(winemaker_db, "select * from Winemaker")
 
-fabric
+# fabric

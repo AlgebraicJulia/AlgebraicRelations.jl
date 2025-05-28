@@ -55,7 +55,7 @@ function AlgebraicRelations.SQLACSets.Fabric.to_sql(::DBSource{SQLite.DB}, t)
         ::Type{<:Union{AbstractString, Char, Symbol}} => "TEXT"
         ::Nothing => "NULL"
         s::Symbol || ::AbstractString => "\'$s\'"
-        FK{T}(id) where T => _to_sql(id)
+        fk::FK{T} where T => _to_sql(fk.val)
         s => s 
     end
     _to_sql(t)
