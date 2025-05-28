@@ -28,6 +28,8 @@ diag = @relation (winemaker_name=winemaker_name) begin
     Grape(id=grape, color=color, species=species)
 end
 
+view_graphviz(to_graphviz(diag, box_labels=:name, junction_labels=:variable))
+
 # look at the UWD in question
 view_graphviz(to_graphviz(get_port, box_labels=true, junction_labels=:variable))
 
@@ -65,6 +67,10 @@ function Base.iterate(iter::PairIterator, state::Int=1)
 end
 Base.IteratorSize(::Type{PairIterator}) = Base.HasLength()
 Base.length(iter::PairIterator) = max(0, length(iter.data) - 1)
+# TODO throw bounds error
+Base.getindex(iter::PairIterator, idx::Int64) = idx ≤ length(iter) ? Tuple(iter.data[idx:idx+1]) : error("bounds error")
+Base.lastindex(iter::PairIterator) = length(iter)
+# iter[i:j]
 
 function boxpath(diag::UntypedNamedRelationDiagram, start::Int, stop::Int)
     path = Int[start]
@@ -97,7 +103,7 @@ get_port=@relation (Port=Port, port_name=port_name) begin
     Junction(_id=junction_id, variable=junction)
 end
 
-query(diag, get_port, (box=5,junction=:grape))
+# query(diag, get_port, (box=5,junction=:grape))
 
 struct JoinQueryResultWrapper
     port_name::Symbol
@@ -114,6 +120,9 @@ function query_boxes(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, l
     _params = js[arity.(Ref(diagram), js, Ref(:junction)) .== 1]
     param_names = subpart(diagram, _params, :variable)
     newport = setdiff(diagram[incident(diag, left, :box), :port_name], diagram[incident(diag, right, :box), :port_name])
+    #
+    # function make_params(diag, jqs::Vector{JoinQueryResultWrapper})
+    # end
     #
     _result = incident(fabric, [(params[col], col) for col in param_names])
     # which junction mediates 6, 5
