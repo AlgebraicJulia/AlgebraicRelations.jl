@@ -29,7 +29,7 @@ diag = @relation (winemaker_name=winemaker_name) begin
 end
 
 # look at the UWD in question
-view_graphviz(to_graphviz(diag, box_labels=true, junction_labels=:variable))
+view_graphviz(to_graphviz(get_port, box_labels=true, junction_labels=:variable))
 
 # helpful to have the Schema visualized when doing lots of subpart/incident
 view_graphviz(to_graphviz(Presentation(acset_schema(diag)), graph_attrs=Dict(:size=>"5", :ratio=>"expand")))
@@ -67,10 +67,9 @@ Base.IteratorSize(::Type{PairIterator}) = Base.HasLength()
 Base.length(iter::PairIterator) = max(0, length(iter.data) - 1)
 
 function boxpath(diag::UntypedNamedRelationDiagram, start::Int, stop::Int)
-    keep_on = true
     path = Int[start]
     boxes = [start]
-    while keep_on
+    while true
         isempty(boxes) && break
         res, = neighboring_boxes.(Ref(diag), boxes, Ref(path))
         union!(path, res)
@@ -93,18 +92,37 @@ get_box=@relation (variable=variable) begin
     Port(box=right, junction=Junction)
 end
 
-function query_boxes(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, left::Int, right::Int)
+get_port=@relation (Port=Port, port_name=port_name) begin
+    Port(_id=Port, box=box, junction=junction_id, port_name=port_name)
+    Junction(_id=junction_id, variable=junction)
+end
+
+query(diag, get_port, (box=5,junction=:grape))
+
+struct JoinQueryResultWrapper
+    port_name::Symbol
+    junction::Symbol
+    ids::Vector{Int}
+end
+
+
+function query_boxes(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, left::Int, right::Int; jqs::Vector{JoinQueryResultWrapper}=JoinQueryResultWrapper[])
     # box
-    box = diag[left, :name]
+    box = diagram[left, :name]
     # params
-    js = box_junctions(diag, left)
-    _params = js[arity.(Ref(diag), js, Ref(:junction)) .== 1]
-    param_names = subpart(diag, _params, :variable)
+    js = box_junctions(diagram, left)
+    _params = js[arity.(Ref(diagram), js, Ref(:junction)) .== 1]
+    param_names = subpart(diagram, _params, :variable)
+    newport = setdiff(diagram[incident(diag, left, :box), :port_name], diagram[incident(diag, right, :box), :port_name])
     #
-    result = incident(fabric, [(params[col], col) for col in param_names])
+    _result = incident(fabric, [(params[col], col) for col in param_names])
     # which junction mediates 6, 5
-    _res = query(diag, get_box, (left=left, right=right))
-    _res.variable => result
+    junct, = js ∩ box_junctions(diagram, right)
+    # port_id, = incident(diag, right, :box) ∩ incident(diag, junct, :junction)
+    result = query(diagram, get_box, (left=left, right=right))
+    junct_name = diagram[junct,:variable]
+    port_name = query(diagram, get_port, (box=right,junction=diagram[junct,:variable])).port_name
+    JoinQueryResultWrapper(only(port_name), only(result.variable), _result)
 end
 
 # querying
