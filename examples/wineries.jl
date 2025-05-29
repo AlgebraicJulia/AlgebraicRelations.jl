@@ -99,14 +99,14 @@ add_fk!(fabric, wine_src, grape_src, :Wine!cultivar => :Grape!Grape_id)
 
 # data
 add_part!(fabric, :Wine, type=:white, cultivar=FK{Grape}(1), name=:Chardonnay) # Sicily
-add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(1), name=:NeroDAvola) # Sicily
-add_part!(fabric, :Wine, type=:fortified, cultivar=FK{Grape}(1), name=:Marsala) # Sicily
-add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(1), name=:Gaglioppo) # Calabria
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(2), name=:NeroDAvola) # Sicily
+add_part!(fabric, :Wine, type=:fortified, cultivar=FK{Grape}(2), name=:Marsala) # Sicily
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(2), name=:Gaglioppo) # Calabria
 add_part!(fabric, :Wine, type=:white, cultivar=FK{Grape}(1), name=:GrecoBianco) # Calabria
-add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(1), name=:Sangiovese) # Puglia and Tuscany
-add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(1), name=:Montepulciano) # Puglia
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(2), name=:Sangiovese) # Puglia and Tuscany
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(2), name=:Montepulciano) # Puglia
 add_part!(fabric, :Wine, type=:white, cultivar=FK{Grape}(1), name=:Trebbiano) # Puglia and Tuscany
-add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(1), name=:Nebbiolo) # Piedmont
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(2), name=:Nebbiolo) # Piedmont
 add_part!(fabric, :Wine, type=:white, cultivar=FK{Grape}(1), name=:MoscatoDAsti) # Piedmont
 
 @present SchWinemaker(FreeSchema) begin

@@ -235,9 +235,9 @@ function query_boxes(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, l
     js = box_junctions(diagram, left)
     _params = js[arity.(Ref(diagram), js, Ref(:junction)) .== 1]
     param_names = subpart(diagram, _params, :variable)
-    newport = setdiff(diagram[incident(diag, left, :box), :port_name], diagram[incident(diag, right, :box), :port_name]) 
+    newport = setdiff(diagram[incident(diagram, left, :box), :port_name], diagram[incident(diagram, right, :box), :port_name]) 
     #
-    _result = incident(fabric, [(jq.vals, jq.port_name) for jq in [JQParam[]; params]])
+    _result = Iterators.flatten(incident(fabric, [(jq.vals, jq.port_name) for jq in [JQParam[]; params]])) |> collect
     # _result = incident(fabric, [(params[col], col) for col in param_names])
     # which junction mediates 6, 5
     junct, = js ∩ box_junctions(diagram, right)

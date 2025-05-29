@@ -64,7 +64,7 @@ function ACSetInterface.subpart(fabric::DataFabric, id, column::Symbol; formatte
     table = subpart(fabric.catalog, tableid, :tname) |> only
     # TODO move handling of FK types to another method
     id = eltype(id) <: FK ? getproperty.(id, :val) : id
-    subpart(source, id, table => column)
+    out = subpart(source, id, table => column)
     formatter(out)
 end
 
