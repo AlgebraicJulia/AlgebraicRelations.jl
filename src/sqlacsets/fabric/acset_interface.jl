@@ -105,6 +105,9 @@ function another(X::ACSet, val, col::Symbol, other::Symbol)
 end
 
 function ACSetInterface.incident(fabric::DataFabric, id, column::Symbol; formatter=identity)
+    if column ∈ [:id, :_id]
+        return formatter(id)
+    end
     # TODO could be multiple
     source = decide_source(fabric, :cname => column)
     _, table = get_table(column)(fabric.catalog) |> only
@@ -121,7 +124,9 @@ export incident
 
 # incident(fabric, (3, :b), ([3,4], :c))
 function ACSetInterface.incident(fabric::DataFabric, kvs::Vector{Tuple{<:T, Symbol}}; formatter=identity) where T
-    ids = [incident(fabric, val, col; formatter=identity) for (val,col) in kvs]
+    ids = map([incident(fabric, val, col; formatter=identity) for (val,col) in kvs]) do result
+        result isa DataFrame ? result._id : result
+    end
     isempty(ids) && return []
     out = intersect(ids...)
     # TODO if a result is a DataFrame, then we have have an issue

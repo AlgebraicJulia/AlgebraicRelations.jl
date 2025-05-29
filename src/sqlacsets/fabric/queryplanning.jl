@@ -27,8 +27,6 @@ function TableConds(q::ACSets.Query.ACSetSQLNode)
     walk(q.cond)
     TableConds(result)
 end
-## render to 
-
 
 function ACSetInterface.incident(fabric::DataFabric, wc::WhereCondition)
     incident(fabric, Symbol(wc.rhs), wc.lhs[2])
@@ -72,10 +70,6 @@ function Fabric.execute!(fabric::DataFabric, q::ACSets.Query.ACSetSQLNode)
     # select the RHS.col where the ids agree
 end
 
-# function getpath(diag, box::Int)
-#     i(n, x) = incident(diag, n, x)
-#     i(
-# end
 
 function getpath(diag, junction_name::Symbol, input::Int)
     i(n,x) = incident(diag,n,x)
@@ -138,22 +132,6 @@ mutable struct QueryRopeGraph
     end
 end
 export QueryRopeGraph
-
-d=Dict(:country=>:Italy, :color=>:Red)
-
-# function Catlab.query(fabric::DataFabric, diagram::UntypedNamedRelatedDiagram, params=(;))
-#     rope = QueryRopeGraph(diagram)
-   
-#     # TODO
-#     map([q.paths[1]]) do path
-#         # first, apply σ or restriction
-#         rhs=path[2]; lhs=path[1]
-#         rhs=diagram[rhs,:name] => incident(fabric, d[q.arity[[rhs]]], q.arity[[rhs]])
-#         lhs=diagram[lhs,:name] => incident(fabric, d[q.arity[[lhs]]], q.arity[[lhs]])
-#         @info lhs, rhs
-#     end
-
-# end
 
 
 function arity(diag::UntypedNamedRelationDiagram, i::Int, label::Symbol=:junction)
@@ -258,7 +236,8 @@ end
 export input_junctions
 
 # query(fabric, diag, (species=:GreenGrape, color=:Green, country=:Italy))
-function Catlab.query(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, params=(;))
+function Catlab.query(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, params=(;); formatter=identity)
+    selects, = subpart.(Ref(diagram), incident(diagram, diagram[:outer_junction], :junction), Ref(:port_name))
     outbox, = subpart.(Ref(diagram), incident(diagram, diagram[:outer_junction], :junction), Ref(:box))
     inboxes = first.(filter(((_, v),) -> length(v.neighbors) == 1, valence(diagram)))
     results = map(inboxes) do inbox
@@ -267,6 +246,10 @@ function Catlab.query(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, 
             query_boxes(fabric, diagram, path...; params=param)
         end
     end
-    # TODO hardcoded
-    incident(fabric, intersect(getproperty.(results, :vals)...), :region)
+    # TODO this implementation prematurely indexes _id from the data frames. its probably more elegant to have all ACSetInterface
+    # functions defined over AbstractDataSource to return a QueryResult object which lets us implement our own methods for handling
+    # cases like this. A simpler solution would be to just return a DataFrame, which has its own methods
+    out = incident(fabric, [(jq.vals, jq.port_name) for jq in results]) 
+    # out = incident(fabric, intersect(getproperty.(results, :vals)...), :region)
+    subpart(fabric, out, selects)
 end
