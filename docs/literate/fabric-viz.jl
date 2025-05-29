@@ -62,21 +62,21 @@ end
 
 @abstract_acset_type AbstractSQLSchema
 
-@acset_type SQLSchema(
+@acset_type _SQLSchema(
     TheorySQLSchema, 
     index=[:col_of, :pk_col, :pk, :to, :from, :fk, :fk_col], 
     unique_index=[:pk_of, :source]
 ) <: AbstractSQLSchema
 
-sch_acs = @acset SQLSchema{Symbol, DataType, Int} begin
+sch_acs = @acset _SQLSchema{Symbol, DataType, Int} begin
     Source=nparts(fabric.catalog, :Source)
     conn=fabric.catalog[:, :conn]
     source_id=fabric.catalog[:, :source_id]
-
+    #
     Table=nparts(fabric.catalog, :Table)
     tab_name=fabric.catalog[:, :tname]
     source=fabric.catalog[:, :source]
-
+    #
     Column=nparts(fabric.catalog, :Column)
     col_name=fabric.catalog[:, :cname]
     col_type=[x ∈ [:PK,:FK] ? :Integer : x for x in nameof.(fabric.catalog[:, :type])]
@@ -121,7 +121,7 @@ function get_cols_table(acs::T, tab_id) where {T<:AbstractSQLSchema}
     setdiff!(tab_fk, tab_pk_fk)
     setdiff!(tab_pk, tab_pk_fk)
     setdiff!(tab_cols, union(tab_fk, tab_pk, tab_pk_fk))
-
+    #
     label_cells_df = DataFrame(
         name=acs[[tab_pk; tab_pk_fk; tab_fk; tab_cols], :col_name],
         type=acs[[tab_pk; tab_pk_fk; tab_fk; tab_cols], :col_type],

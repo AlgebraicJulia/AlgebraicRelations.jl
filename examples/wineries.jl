@@ -8,17 +8,17 @@ fabric = DataFabric()
 @present SchClimate(FreeSchema) begin
     Name::AttrType
     Climate::Ob
-    climate::Attr(Climate, Name)
+    climate_type::Attr(Climate, Name)
 end
 @acset_type Climate(SchClimate)
 climate = InMemory(Climate{Symbol}())
 climate_src = add_source!(fabric, climate)
 
 # data
-add_part!(fabric, :Climate, climate=:Cool)
-add_part!(fabric, :Climate, climate=:Intermediate)
-add_part!(fabric, :Climate, climate=:Warm)
-add_part!(fabric, :Climate, climate=:Hot)
+add_part!(fabric, :Climate, climate_type=:Cool)
+add_part!(fabric, :Climate, climate_type=:Intermediate)
+add_part!(fabric, :Climate, climate_type=:Warm)
+add_part!(fabric, :Climate, climate_type=:Hot)
 
 @present SchGrape(FreeSchema) begin
     (Name, Climate)::AttrType
@@ -35,14 +35,16 @@ add_part!(fabric, :Grape, color=:Red, species=:RedGrape)
 @present SchClimateGrape(FreeSchema) begin
     (Grape, Climate)::AttrType
     ClimateGrape::Ob
-    grape::Attr(ClimateGrape, Grape)
-    climate::Attr(ClimateGrape, Climate)
+    cg_grape::Attr(ClimateGrape, Grape)
+    cg_climate::Attr(ClimateGrape, Climate)
 end
 @acset_type ClimateGrape(SchClimateGrape)
 climate_grape = InMemory(ClimateGrape{FK{Grape}, FK{Climate}}())
 climate_grape_src = add_source!(fabric, climate_grape)
-add_fk!(fabric, climate_grape_src, grape_src, :ClimateGrape!grape => :Grape!Grape_id)
-add_fk!(fabric, climate_grape_src, climate_src, :ClimateGrape!climate => :Climate!Climate_id)
+add_fk!(fabric, climate_grape_src, grape_src, :ClimateGrape!cg_grape => :Grape!Grape_id)
+add_fk!(fabric, climate_grape_src, climate_src, :ClimateGrape!cg_climate => :Climate!Climate_id)
+
+# TODO add data
 
 @present SchCountry(FreeSchema) begin
     Name::AttrType
@@ -62,26 +64,26 @@ add_part!(fabric, :Country, country=:NewZealand)
 @present SchCountryClimate(FreeSchema) begin
     (Name, Country, Climate)::AttrType
     CountryClimate::Ob
-    country::Attr(CountryClimate, Country)
-    climate::Attr(CountryClimate, Climate)
-    region::Attr(CountryClimate, Name)
+    cc_country::Attr(CountryClimate, Country)
+    cc_climate::Attr(CountryClimate, Climate)
+    cc_region::Attr(CountryClimate, Name)
 end
 @acset_type CountryClimate(SchCountryClimate)
 country_climate = InMemory(CountryClimate{Symbol, FK{Country}, FK{Climate}}())
 country_climate_src = add_source!(fabric, country_climate)
-add_fk!(fabric, country_climate_src, country_src, :CountryClimate!country => :Country!Country_id)
-add_fk!(fabric, country_climate_src, climate_src, :CountryClimate!climate => :Climate!Climate_id)
+add_fk!(fabric, country_climate_src, country_src, :CountryClimate!cc_country => :Country!Country_id)
+add_fk!(fabric, country_climate_src, climate_src, :CountryClimate!cc_climate => :Climate!Climate_id)
 
 # data
-add_part!(fabric, :CountryClimate, country=FK{Country}(1), climate=FK{Climate}(2), region=:Sicily)
-# chardonnay, nero d'avola, marsala
-add_part!(fabric, :CountryClimate, country=FK{Country}(1), climate=FK{Climate}(2), region=:Calabria)
+add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Climate}(2), cc_region=:Sicily)
+# chardonnay, nero d'avola, marsalacc_
+add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Climate}(2), cc_region=:Calabria)
 # gaglioppo, greco bianco
-add_part!(fabric, :CountryClimate, country=FK{Country}(1), climate=FK{Climate}(2), region=:Puglia)
-# sangiovese, montepulciano, trebbiano
-add_part!(fabric, :CountryClimate, country=FK{Country}(1), climate=FK{Climate}(2), region=:Tuscany)
+add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Climate}(2), cc_region=:Puglia)
+# sangiovese, montepulciano, trebbicc_ano
+add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Climate}(2), cc_region=:Tuscany)
 # sangiovese, merlot, trebbiano
-add_part!(fabric, :CountryClimate, country=FK{Country}(1), climate=FK{Climate}(2), region=:Piedmont)
+add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Climate}(2), cc_region=:Piedmont)
 # nebbiolo, moscato d'asti
 
 @present SchWine(FreeSchema) begin
@@ -145,27 +147,27 @@ add_part!(fabric, :Winemaker, [
 @present SchWineWinemaker(FreeSchema) begin
     (Name, Wine, Winemaker)::AttrType
     WineWinemaker::Ob
-    wine::Attr(WineWinemaker, Wine)
-    winemaker::Attr(WineWinemaker, Winemaker)
+    wwm_wine::Attr(WineWinemaker, Wine)
+    wwm_winemaker::Attr(WineWinemaker, Winemaker)
 end
 @acset_type WineWinemaker(SchWineWinemaker)
 wine_winemaker = InMemory(WineWinemaker{Symbol, FK{Wine}, FK{Winemaker}}())
 wine_winemaker_src = add_source!(fabric, wine_winemaker)
-add_fk!(fabric, wine_winemaker_src, wine_src, :WineWinemaker!wine => :Wine!Wine_id)
-add_fk!(fabric, wine_winemaker_src, winemaker_src, :WineWinemaker!winemaker => :Winemaker!Winemaker_id)
+add_fk!(fabric, wine_winemaker_src, wine_src, :WineWinemaker!wwm_wine => :Wine!Wine_id)
+add_fk!(fabric, wine_winemaker_src, winemaker_src, :WineWinemaker!wwm_winemaker => :Winemaker!Winemaker_id)
 
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(1), winemaker=FK{Winemaker}(1))
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(2), winemaker=FK{Winemaker}(2))
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(3), winemaker=FK{Winemaker}(3))
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(4), winemaker=FK{Winemaker}(4))
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(5), winemaker=FK{Winemaker}(5))
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(6), winemaker=FK{Winemaker}(6))
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(6), winemaker=FK{Winemaker}(7))
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(7), winemaker=FK{Winemaker}(8))
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(8), winemaker=FK{Winemaker}(9))
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(8), winemaker=FK{Winemaker}(10))
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(9), winemaker=FK{Winemaker}(11))
-add_part!(fabric, :WineWinemaker, wine=FK{Wine}(10), winemaker=FK{Winemaker}(12))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(1), wwm_winemaker=FK{Winemaker}(1))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(2), wwm_winemaker=FK{Winemaker}(2))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(3), wwm_winemaker=FK{Winemaker}(3))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(4), wwm_winemaker=FK{Winemaker}(4))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(5), wwm_winemaker=FK{Winemaker}(5))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(6), wwm_winemaker=FK{Winemaker}(6))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(6), wwm_winemaker=FK{Winemaker}(7))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(7), wwm_winemaker=FK{Winemaker}(8))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(8), wwm_winemaker=FK{Winemaker}(9))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(8), wwm_winemaker=FK{Winemaker}(10))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(9), wwm_winemaker=FK{Winemaker}(11))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(10), wwm_winemaker=FK{Winemaker}(12))
 
 @present SchFood(FreeSchema) begin
     Name::AttrType
@@ -185,17 +187,17 @@ add_part!(fabric, :Food, food="cheese", comments="sharp")
 @present SchWineFood(FreeSchema) begin
     (Wine, Food)::AttrType
     WineFood::Ob
-    food::Attr(WineFood, Food)
-    wine::Attr(WineFood, Wine)
+    wf_food::Attr(WineFood, Food)
+    wf_wine::Attr(WineFood, Wine)
 end
 @acset_type WineFood(SchWineFood)
 winefood = InMemory(WineFood{FK{Wine}, FK{Food}}())
 winefood_src = add_source!(fabric, winefood)
-add_fk!(fabric, winefood_src, food_src, :WineFood!food => :Food!Food_id)
-add_fk!(fabric, winefood_src, winemaker_src, :WineFood!wine => :Winemaker!Winemaker_id)
+add_fk!(fabric, winefood_src, food_src, :WineFood!wf_food => :Food!Food_id)
+add_fk!(fabric, winefood_src, winemaker_src, :WineFood!wf_wine => :Winemaker!Winemaker_id)
 
 # data
-add_part!(fabric, :WineFood, food=FK{Food}(1), wine=FK{Wine}(1))
+add_part!(fabric, :WineFood, wf_food=FK{Food}(1), wf_wine=FK{Wine}(1))
 # TODO does not guard against constraint
 
 # TODO need to specify where 
