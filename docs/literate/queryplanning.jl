@@ -23,6 +23,8 @@ query(fabric, diag, (species=:GreenGrape, color=:Green, country=:Italy))
 
 query(fabric, diag, (species=:RedGrape, color=:Red, country=:Italy))
 
+# TODO need to throw error when params are not given
+query(fabric, diag, (country=:USA,)) #= this breaks =#
 
 view_graphviz(to_graphviz(diag, box_labels=:name, junction_labels=:variable))
 

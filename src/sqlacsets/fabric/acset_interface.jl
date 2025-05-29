@@ -64,8 +64,12 @@ function ACSetInterface.subpart(fabric::DataFabric, id, column::Symbol; formatte
     table = subpart(fabric.catalog, tableid, :tname) |> only
     # TODO move handling of FK types to another method
     id = eltype(id) <: FK ? getproperty.(id, :val) : id
-    out = subpart(source, id, table => column)
-    formatter(out)
+    if !isempty(id)
+        out = subpart(source, id, table => column)
+        formatter(out)
+    else
+        []
+    end
 end
 
 # Winemaker => name
