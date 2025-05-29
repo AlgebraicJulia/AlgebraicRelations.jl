@@ -161,4 +161,96 @@ d=Dict(:country=>:Italy, :color=>:Red)
 # end
 
 
+function arity(diag::UntypedNamedRelationDiagram, i::Int, label::Symbol=:junction)
+    length(incident(diag, i, label))
+end
+export arity
+
+function box_junctions(diag::UntypedNamedRelationDiagram, b::Int)
+    diag[incident(diag, b, :box), :junction]
+end
+export box_junctions
+
+function neighboring_boxes(diag::UntypedNamedRelationDiagram, b::Int, path::Vector{Int}=Int[])
+    junctions_of_box_id = box_junctions(diag, b) # 7, 8, 9
+    neighbor = setdiff(diag[vcat(incident(diag, junctions_of_box_id, :junction)...), :box], b)
+    setdiff(neighbor, path)
+end
+export neighboring_boxes
+
+# this should in actuality check neighboring boxes
+function valence(diag::UntypedNamedRelationDiagram)
+    map(parts(diag, :Box)) do box
+        box => (arity=arity(diag, box, :box), neighbors=neighboring_boxes(diag, box))
+    end
+end
+export valence
+
+struct PairIterator{T}; data::Vector{T} end
+function Base.iterate(iter::PairIterator, state::Int=1)
+    if state < length(iter.data)
+        ((iter.data[state], iter.data[state+1]), state+1) 
+    end
+end
+Base.IteratorSize(::Type{PairIterator}) = Base.HasLength()
+Base.length(iter::PairIterator) = max(0, length(iter.data) - 1)
+# TODO throw bounds error
+Base.getindex(iter::PairIterator, idx::Int64) = idx ≤ length(iter) ? Tuple(iter.data[idx:idx+1]) : error("bounds error")
+Base.lastindex(iter::PairIterator) = length(iter)
+# iter[i:j]
+
+function boxpath(diag::UntypedNamedRelationDiagram, start::Int, stop::Int)
+    path = Int[start]
+    boxes = [start]
+    while true
+        isempty(boxes) && break
+        res, = neighboring_boxes.(Ref(diag), boxes, Ref(path))
+        union!(path, res)
+        boxes = res
+        if stop ∈ res
+            break
+        end
+    end
+    PairIterator(path)
+end
+export boxpath
+
+get_box=@relation (variable=variable) begin
+    Junction(_id=Junction, variable=variable)
+    Port(box=left, junction=Junction)
+    Port(box=right, junction=Junction)
+end
+
+get_port=@relation (Port=Port, port_name=port_name) begin
+    Port(_id=Port, box=box, junction=junction_id, port_name=port_name)
+    Junction(_id=junction_id, variable=junction)
+end
+
+struct JQParam
+    junction::Symbol
+    port_name::Symbol
+    vals # could be ids
+end
+export JQParam
+
+function query_boxes(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, left::Int, right::Int; params::Union{JQParam, Vector{JQParam}}=JQParam[])
+    # box
+    box = diagram[left, :name]
+    # params
+    js = box_junctions(diagram, left)
+    _params = js[arity.(Ref(diagram), js, Ref(:junction)) .== 1]
+    param_names = subpart(diagram, _params, :variable)
+    newport = setdiff(diagram[incident(diag, left, :box), :port_name], diagram[incident(diag, right, :box), :port_name]) 
+    #
+    _result = incident(fabric, [(jq.vals, jq.port_name) for jq in [JQParam[]; params]])
+    # _result = incident(fabric, [(params[col], col) for col in param_names])
+    # which junction mediates 6, 5
+    junct, = js ∩ box_junctions(diagram, right)
+    # port_id, = incident(diag, right, :box) ∩ incident(diag, junct, :junction)
+    result = query(diagram, get_box, (left=left, right=right))
+    junct_name = diagram[junct,:variable]
+    port_name = query(diagram, get_port, (box=right,junction=diagram[junct,:variable])).port_name
+    JQParam(only(result.variable), only(port_name), _result)
+end
+export query_boxes
 

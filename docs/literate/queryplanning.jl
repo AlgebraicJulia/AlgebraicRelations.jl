@@ -30,6 +30,8 @@ end
 
 view_graphviz(to_graphviz(diag, box_labels=:name, junction_labels=:variable))
 
+view_graphviz(to_graphviz(diag, box_labels=true))
+
 # look at the UWD in question
 view_graphviz(to_graphviz(get_port, box_labels=true, junction_labels=:variable))
 
@@ -87,7 +89,10 @@ function boxpath(diag::UntypedNamedRelationDiagram, start::Int, stop::Int)
     PairIterator(path)
 end
 
-params = Dict(:color => :Green, :species => :GreenGrape)
+# use valence to generate boxpaths
+# get independent boxpaths by taking intersection
+boxpath(diag, 6, 2)
+boxpath(diag, 4, 2)
 
 incident(fabric, [(params[col], col) for col in [:color, :species]])
 
@@ -105,39 +110,45 @@ end
 
 # query(diag, get_port, (box=5,junction=:grape))
 
-struct JoinQueryResultWrapper
-    port_name::Symbol
+struct JQParam
     junction::Symbol
-    ids::Vector{Int}
+    port_name::Symbol
+    vals # could be ids
 end
 
+params = Dict(:color => :Green, :species => :GreenGrape)
 
-function query_boxes(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, left::Int, right::Int; jqs::Vector{JoinQueryResultWrapper}=JoinQueryResultWrapper[])
+params = [JQParam(:_, :color, :Green), JQParam(:_, :species, :GreenGrape)]
+
+function query_boxes(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, left::Int, right::Int; params::Union{JQParam, Vector{JQParam}}=JQParam[])
     # box
     box = diagram[left, :name]
     # params
     js = box_junctions(diagram, left)
     _params = js[arity.(Ref(diagram), js, Ref(:junction)) .== 1]
     param_names = subpart(diagram, _params, :variable)
-    newport = setdiff(diagram[incident(diag, left, :box), :port_name], diagram[incident(diag, right, :box), :port_name])
+    newport = setdiff(diagram[incident(diag, left, :box), :port_name], diagram[incident(diag, right, :box), :port_name]) 
     #
-    # function make_params(diag, jqs::Vector{JoinQueryResultWrapper})
-    # end
-    #
-    _result = incident(fabric, [(params[col], col) for col in param_names])
+    _result = incident(fabric, [(jq.vals, jq.port_name) for jq in [JQParam[]; params]])
+    # _result = incident(fabric, [(params[col], col) for col in param_names])
     # which junction mediates 6, 5
     junct, = js ∩ box_junctions(diagram, right)
     # port_id, = incident(diag, right, :box) ∩ incident(diag, junct, :junction)
     result = query(diagram, get_box, (left=left, right=right))
     junct_name = diagram[junct,:variable]
     port_name = query(diagram, get_port, (box=right,junction=diagram[junct,:variable])).port_name
-    JoinQueryResultWrapper(only(port_name), only(result.variable), _result)
+    JQParam(only(result.variable), only(port_name), _result)
 end
 
 # querying
 map(boxpath(diag, 6, 2)) do (l, r)
-    query_boxes(fabric, diag, l, r) # TODO this result will be a param for the previous 
+    query_boxes(fabric, diag, l, r; params=params) # TODO this result will be a param for the previous 
 end
+
+p1=query_boxes(fabric, diag, 6, 5; params=params)
+p2=query_boxes(fabric, diag, 5, 1; params=p1)
+p3=query_boxes(fabric, diag, 1, 2; params=p2)
+
 
 incident(fabric, FK{Grape}(1), :cultivar)
 

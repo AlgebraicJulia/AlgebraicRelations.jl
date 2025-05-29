@@ -100,11 +100,21 @@ function ACSetInterface.subpart(fabric::DataFabric, id=(:), columns::Vector{Symb
     formatter(out)
 end
 
+function another(X::ACSet, val, col::Symbol, other::Symbol)
+    subpart(X, incident(X, val, col), other)
+end
+
 function ACSetInterface.incident(fabric::DataFabric, id, column::Symbol; formatter=identity)
     # TODO could be multiple
     source = decide_source(fabric, :cname => column)
     _, table = get_table(column)(fabric.catalog) |> only
-    out = incident(source, id, only(table) => column)
+    # TODO I don't like calling other here. 
+    # what if the column (`val`) had the same name as another, so `incident` in `another` returns |vector|>1?
+    fkmaybe = let T = only(another(fabric.catalog, column, :cname, :type))
+        T <: FK ? T : identity
+    end
+    # TODO we broadcast over ids, which excludes vector-valued data
+    out = incident(source, fkmaybe.(id), only(table) => column)
     formatter(out)
 end
 export incident
@@ -121,12 +131,15 @@ end
 
 # TODO does not work with DataStore
 function ACSetInterface.incident(fabric::DataFabric, id, columns::Vector{Symbol}; formatter=identity)
+    @info columns
     out = reduce((new_id, column) -> incident(fabric, new_id, column), columns; init=id)
     formatter(out)
 end
 
+# calls ultimately go into this
 function ACSetInterface.incident(fabric::DataFabric, value, tablecol::Tuple{Symbol, Symbol}; formatter=identity)
     source = decide_source(fabric, :tname => tablecol)
+    @warn tablecol
     out = incident(source, value, tablecol[2])
     formatter(out)
 end
