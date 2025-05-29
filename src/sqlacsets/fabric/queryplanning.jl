@@ -249,3 +249,24 @@ function query_boxes(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, l
 end
 export query_boxes
 
+function input_junctions(diagram::UntypedNamedRelationDiagram, b::Int)
+    junctions = filter(diagram[incident(diagram, b, :box), :junction]) do j # 7, 8, 9
+        1==count(==(j), diagram[:junction])
+    end
+    diagram[junctions, :variable]
+end
+export input_junctions
+
+# query(fabric, diag, (species=:GreenGrape, color=:Green, country=:Italy))
+function Catlab.query(fabric::DataFabric, diagram::UntypedNamedRelationDiagram, params=(;))
+    outbox, = subpart.(Ref(diagram), incident(diagram, diagram[:outer_junction], :junction), Ref(:box))
+    inboxes = first.(filter(((_, v),) -> length(v.neighbors) == 1, valence(diagram)))
+    results = map(inboxes) do inbox
+        box_params = [JQParam(:_, k, params[k]) for k in input_junctions(diagram, inbox)]
+        foldl(boxpath(diagram, inbox, only(outbox)); init=box_params) do param, path
+            query_boxes(fabric, diagram, path...; params=param)
+        end
+    end
+    # TODO hardcoded
+    incident(fabric, intersect(getproperty.(results, :vals)...), :region)
+end

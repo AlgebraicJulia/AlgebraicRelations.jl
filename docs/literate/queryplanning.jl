@@ -23,7 +23,7 @@ diag = @relation (winemaker_name=winemaker_name) begin
     WineWinemaker(wwm_wine=wine, wwm_winemaker=winemaker_id)
     Winemaker(id=winemaker_id, region=region, winemaker=winemaker_name)
     CountryClimate(id=region, cc_country=country_id)
-    Country(id=country_id, country=name)
+    Country(id=country_id, country=country)
     Wine(id=wine, cultivar=grape)
     Grape(id=grape, color=color, species=species)
 end
@@ -39,6 +39,8 @@ view_graphviz(to_graphviz(diag, box_labels=true))
 view_graphviz(to_graphviz(Presentation(acset_schema(diag)), graph_attrs=Dict(:size=>"5", :ratio=>"expand")))
 
 # q = QueryRopeGraph(diag)
+
+query(fabric, diag)
 
 # use valence to generate boxpaths
 # get independent boxpaths by taking intersection
@@ -56,6 +58,19 @@ p1=query_boxes(fabric, diag, 6, 5; params=params)
 p2=query_boxes(fabric, diag, 5, 1; params=p1)
 p3=query_boxes(fabric, diag, 1, 2; params=p2)
 
+function foo(params=(;))
+    params
+end
+
+paths=boxpath(diag, 6, 2)
+
+ids=foldl(paths; init=params) do param, path
+    query_boxes(fabric, diag, path...; params=param)
+end
+
+params = JQParam(:_, :country, :Italy)
+q1=query_boxes(fabric, diag, 4, 3; params=params)
+
 params = JQParam(:_, :country, :Italy)
 q1=query_boxes(fabric, diag, 4, 3; params=params)
 q2=query_boxes(fabric, diag, 3, 2; params=q1)
@@ -65,6 +80,8 @@ q2=query_boxes(fabric, diag, 3, 2; params=q1)
 # to call incident on it
 res = incident(fabric, q2.vals, :region)
 ## ANSWER ^^^
+
+query(fabric, diag, (species=:GreenGrape, color=:Green, country=:Italy))
 
 subpart(fabric, res._id ∩ p3.vals, :winemaker) 
 
@@ -92,9 +109,6 @@ v3 = incident(fabric,
 using Catlab.WiringDiagrams.RelationDiagrams: UntypedNamedRelationDiagram
 
 
-function Catlab.query(fabric::DataFabric, diagram::UntypedNamedRelatedDiagram, params=(;))
-    rope = QueryRopeGraph(diagram)
-end
 
 function Base.empty(fabric::DataFabric)
     typ = typeof(fabric.graph)()
