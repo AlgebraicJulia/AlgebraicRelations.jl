@@ -37,31 +37,46 @@ export recatalog!
 function DenseACSets.acset_schema(m::InMemory)
     acset_schema(m.value)
 end
-export acset_schema
+
+function ACSetInterface.nparts(m::InMemory, args...)
+    nparts(m.value, args...)
+end
 
 function ACSetInterface.add_part!(m::InMemory, args...)
     add_part!(m.value, args...)
 end
-export add_part!
 
 function ACSetInterface.add_parts!(m::InMemory, args...)
     add_parts!(m.value, args...)
 end
-export add_parts!
 
-function ACSetInterface.subpart(m::InMemory, (:), tablecolumn::Pair{Symbol, Symbol})
-    subpart(m.value, :, tablecolumn.second)
-    # DataFrame(NamedTuple{(tablecolumn.second,)}(Tuple([result])))
+function ACSetInterface.subpart(m::InMemory, Colon, tablecolumn::Pair{Symbol, Symbol})
+    df = DataFrame()
+    result = subpart(m.value, :, tablecolumn.second)
+    df[!, tablecolumn.second] = result isa AbstractVector ? result : [result]
+    df
 end
-export subpart
 
+# TODO add types
 function ACSetInterface.subpart(m::InMemory, id, column::Symbol)
-    subpart(m.value, id, column)
+    df = DataFrame()
+    result = subpart(m.value, id, column)
+    df[:, column] = result
 end
 
 function ACSetInterface.incident(m::InMemory, id, tablecolumn::Pair{Symbol, Symbol})
     incident(m.value, id, tablecolumn.second)
 end
-export incident
+
+function ACSetInterface.incident(m::InMemory, id, column::Symbol; formatter=identity)
+    out = incident(m.value, id, column)
+    formatter(out)
+end
+
+function ACSetInterface.incident(m::InMemory, parts, f::T; formatter=identity) where {T<:Tuple{Vararg{Union{Symbol, Tuple{Vararg{Symbol}}}}}}
+    out = intersect([incident(m, parts[i], f[i]) for i in eachindex(f)]...)
+    formatter(out)
+end
+
 
 end

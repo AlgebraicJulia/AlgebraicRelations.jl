@@ -48,15 +48,17 @@ export create
 # to_sql(::DBSource{SQLite.DB}, x) = x
 
 function AlgebraicRelations.SQLACSets.Fabric.to_sql(::DBSource{SQLite.DB}, t)
-    @match t begin
+    _to_sql = @λ begin
         ::Type{<:Real} => "REAL"
         ::Type{<:Integer} => "INTEGER"
-        ::Type{<:T} where T <: Union{AbstractString, Char, Symbol} => "TEXT"
+        ::Type{<:FK} => "INTEGER" # TODO foreign key
+        ::Type{<:Union{AbstractString, Char, Symbol}} => "TEXT"
         ::Nothing => "NULL"
-        ::Symbol => string(t)
-        ::String => "\'$t\'"
-        _ => "TEXT"
+        s::Symbol || ::AbstractString => "\'$s\'"
+        fk::FK{T} where T => _to_sql(fk.val)
+        s => s 
     end
+    _to_sql(t)
 end
 
 function AlgebraicRelations.SQLACSets.Fabric.from_sql(::DBSource{SQLite.DB}, s::String)
@@ -71,7 +73,7 @@ end
 # I would be at peace if formatting and value representation were separated
 function tosql(source::DBSource{SQLite.DB}, v::NamedTuple{T}; key::Bool=true) where T
     join(collect(Iterators.map(pairs(v)) do (k, v)
-        key ? "$(tosql(source, k)) = $(tosql(source, v))" : "$(tosql(source, v))"
+        key ? "$(to_sql(source, k)) = $(to_sql(source, v))" : "$(to_sql(source, v))"
     end), ", ")
 end
 

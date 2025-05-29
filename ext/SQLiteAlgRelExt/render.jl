@@ -1,6 +1,14 @@
 using FunSQL
 using FunSQL: render, reflect
 
+# import ACSets.Query: WhereCondition
+
+
+# TODO have table alias
+# function FunSQL.render(source::DBSource{SQLite.DB}, wc::WhereCondition)
+#     "$(wc.lhs[1]).$(wc.lhs[2]) = $(to_sql(source, wc.rhs))"
+# end
+
 """ Dispatches FunSQL's render SQLNodes """
 function FunSQL.render(source::DBSource{SQLite.DB}, n::FunSQL.SQLNode)
     FunSQL.render(source.conn, n)

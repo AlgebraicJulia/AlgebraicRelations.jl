@@ -11,9 +11,10 @@ using ..SQLACSetSyntax
 # If all the data sources have known database schema, then we can assembly the
 # data into a single ACSet schema.
 using Catlab
+using Catlab.Graphics.Graphviz
 using ACSets
 
-using MLStyle: @match
+using MLStyle: @match, @as_record
 using Dates
 using DataFrames
 using DBInterface
@@ -21,6 +22,7 @@ using FunSQL
 using FunSQL: reflect
 import FunSQL: render
 
+using StructEquality
 using Reexport
 
 function columntypes end
@@ -30,8 +32,9 @@ struct PK end
 export PK
 
 # foreign key wrapper
-struct FK{T<:ACSet} 
-    val
+# TODO as_record
+@struct_hash_equal struct FK{T<:ACSet} 
+    val::Int
 end
 export FK
 
@@ -66,6 +69,61 @@ end
 DataSourceGraph() = DataSourceGraph{Symbol, AbstractDataSource, Pair{Symbol, Symbol}}()
 export DataSourceGraph
 
+Catlab.src(g::DataSourceGraph, e::Int) = subpart(g, e, :src)
+Catlab.tgt(g::DataSourceGraph, e::Int) = subpart(g, e, :tgt)
+
+function Catlab.to_graphviz(g::DataSourceGraph)::Graphviz.Graph
+    gv_name(v::Int) = "$(something(subpart(g, v, :label), :a))"
+    gv_path(e::Int) = [gv_name(src(g,e)), gv_name(tgt(g,e))]
+    stmts = Graphviz.Statement[]
+    for v in parts(g, :V)
+        push!(stmts, Graphviz.Node(gv_name(v), Dict()))
+    end
+    for e in parts(g, :E)
+        push!(stmts, Graphviz.Edge(gv_path(e), Dict()))
+    end
+    # attrs = gprops(g)
+    Graphviz.Graph(
+      name = "G",
+      directed = true,
+      # prog = get(attrs, :prog, is_directed ? "dot" : "neato"),
+      stmts = stmts,
+      # graph_attrs = get(attrs, :graph, Dict()),
+      # node_attrs = get(attrs, :node, Dict()),
+      # edge_attrs = get(attrs, :edge, Dict()),
+    )
+end
+
+function Catlab.Graphics.Graphviz.view_graphviz(g::DataSourceGraph)
+    view_graphviz(to_graphviz(g))
+end
+export view_graphviz
+
+# TODO change Any to AbstractResult
+QueryResultDSGraph = DataSourceGraph{Symbol, Union{DataFrame, Nothing}, Symbol}
+
+struct QueryResultWrapper
+    qg::QueryResultDSGraph
+    # query
+end
+export QueryResultWrapper
+
+function QueryResultWrapper(g::DataSourceGraph)
+    qg = QueryResultDSGraph()
+    add_parts!(qg, :V, nparts(g, :V), label=subpart(g, :label))
+    edges = parts(g, :E)
+    for e in edges
+        foot1 = subpart(g, e, :src)
+        foot2 = subpart(g, e, :tgt)
+        label1 = subpart(g, foot1, :label)
+        label2 = subpart(g, foot2, :label)
+        apex = add_part!(qg, :V, label=Symbol("$label1⨝$label2"))
+        add_parts!(qg, :E, 2, src=[apex, apex], tgt=[foot1, foot2], edgelabel=[label1, label2])
+    end
+    QueryResultWrapper(qg)
+end
+export QueryResultWrapper
+
 # DataFabric
 struct Log
     time::DateTime
@@ -78,16 +136,18 @@ export Log
     # this will store the connections, their schema, and values
     graph::DataSourceGraph = DataSourceGraph()
     catalog::Catalog = Catalog()
+    queries::Vector{QueryResultWrapper} = QueryResultWrapper[]
     log::Vector{Log} = Log[]
 end
 export DataFabric
 
 """ accesses the catalog for an abstract data source """
-function catalog end
+catalog(fabric::DataFabric) = fabric.catalog
 export catalog
 
-# accessor
-catalog(fabric::DataFabric) = fabric.catalog
+""" accesses the queries for a given data fabric """
+queries(fabric::DataFabric) = fabric.queries
+export queries
 
 """ pointwise recataloging of nodes """
 function recatalog!(fabric::DataFabric)
@@ -97,16 +157,18 @@ function recatalog!(fabric::DataFabric)
     fabric
 end
 
-# TODO don't want copy sources , TODO need idempotence
-function reflect!(fabric::DataFabric)
-    foreach(parts(fabric.graph, :V)) do source_id
+function reflect_source!(fabric::DataFabric, vs::Vector{Int})
+    foreach(vs) do source_id
         source = subpart(fabric.graph, source_id, :value)
         schema = SQLSchema(Presentation(acset_schema(source)))
         types = columntypes(source)
         add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(source), types=types)
     end
+end
+
+function reflect_edges!(fabric::DataFabric, es::Vector{Int})
     # TODO improve this
-    foreach(parts(fabric.graph, :E)) do edge_id
+    foreach(es) do edge_id
         src, tgt, edgelabel = subpart.(Ref(fabric.graph), edge_id, [:src, :tgt, :edgelabel])
         # gets table associated to source
         fromtable, fromcol = split("$(edgelabel.first)", "!")
@@ -120,13 +182,24 @@ function reflect!(fabric::DataFabric)
             add_part!(fabric.catalog, :FK, to=to, from=from)
         end
     end
+end
+
+
+# TODO don't want copy sources , TODO need idempotence
+function reflect!(fabric::DataFabric; source_id::Union{Int, Nothing}=nothing, edge_id::Union{Int, Nothing}=nothing)
+    vs = isnothing(source_id) ? isnothing(edge_id) ? parts(fabric.graph, :V) : Int[] : [source_id]
+    reflect_source!(fabric, vs)
+    es = isnothing(edge_id) ? isnothing(source_id) ? parts(fabric.graph, :E) : Int[] : [edge_id]
+    reflect_edges!(fabric, es)
     catalog(fabric)
 end
 export reflect!
 
 # mutators 
-function add_source!(fabric::DataFabric, source::AbstractDataSource)
-    add_part!(fabric.graph, :V, label=nameof(source), value=source)
+function add_source!(fabric::DataFabric, source::AbstractDataSource, label=nameof(source))
+    source_id = add_part!(fabric.graph, :V, label=label, value=source)
+    reflect!(fabric; source_id=source_id)
+    source_id
 end
 export add_source!
 
@@ -136,9 +209,12 @@ end
 export add_table!
 
 function add_fk!(fabric::DataFabric, src::Int, tgt::Int, elabel::Pair{Symbol, Symbol})
-    add_part!(fabric.graph, :E, src=src, tgt=tgt, edgelabel=elabel)
+    edge_id = add_part!(fabric.graph, :E, src=src, tgt=tgt, edgelabel=elabel)
+    reflect!(fabric; edge_id=edge_id)
+    edge_id
 end
 export add_fk!
+
 
 # Executing commands on data fabric
 
@@ -155,6 +231,7 @@ export execute!
 
 # ACSet Interface for the Fabric. It determines which data source to dispatch the ACSet function on
 include("acset_interface.jl")
+include("queryplanning.jl")
 
 include("datasources/database/DatabaseDS.jl")
 include("datasources/inmemory/InMemoryDS.jl")
