@@ -3,6 +3,8 @@ using AlgebraicRelations
 axolotl = WebAPI(conn="https://theaxolotlapi.netlify.app/")
 
 subpart(axolotl)
+subpart(axolotl; path="*.2.2.1.2.1.4.:children")
+# subpart(axolotl; path="*.1.5.:children") 
 
 randomgenres = WebAPI(conn="https://binaryjazz.us/wp-json/genrenator/v1/genre/")
 
