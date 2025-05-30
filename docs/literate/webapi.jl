@@ -25,10 +25,18 @@ tables = subpart(tableconn; path="*.2.1.:text", formatter=JSON3.read)
 
 table = "care_site"
 
-queryconn = WebAPI(conn="https://redivis.com/api/v1/tables/Demo.cms_synthetic_patient_data_omop.$table/rows?format=jsonl")
+queryconn = WebAPI(conn="https://redivis.com/api/v1/tables/Demo.cms_synthetic_patient_data_omop.$table/rows?format=jsonl", token_envar="JULIA_OMOP_API_KEY")
 
 # cacheing queries. if 
-subpart(queryconn, Dict("authorization" => "Bearer $access_token", "accept" => "application/json;odata=verbse",); path="*.2.1.:text") |> Base.Fix2(split, "\n") .|> JSON3.read
+tmp = subpart(queryconn; path="*.2.1.:text") |> Base.Fix2(split, "\n") .|> JSON3.read
+# subpart(queryconn)
+tmp_df = let 
+    DataFrame([
+        NamedTuple(t) for t in tmp
+    ])
+end
+module mymodule end
+JSON3.@generatetypes tmp Main.mymodule
 
 struct Infer end
 
