@@ -194,7 +194,7 @@ end
 winefood = InMemory(WineFood{FK{Wine}, FK{Food}}())
 winefood_src = add_source!(fabric, winefood)
 add_fk!(fabric, winefood_src, food_src, :WineFood!wf_food => :Food!Food_id)
-add_fk!(fabric, winefood_src, winemaker_src, :WineFood!wf_wine => :Winemaker!Winemaker_id)
+add_fk!(fabric, winefood_src, winemaker_src, :WineFood!wf_wine => :Wine!Wine_id)
 
 # data
 add_part!(fabric, :WineFood, wf_food=FK{Food}(1), wf_wine=FK{Wine}(1))
