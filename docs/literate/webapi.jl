@@ -28,15 +28,9 @@ table = "care_site"
 queryconn = WebAPI(conn="https://redivis.com/api/v1/tables/Demo.cms_synthetic_patient_data_omop.$table/rows?format=jsonl", token_envar="JULIA_OMOP_API_KEY")
 
 # cacheing queries. if 
-tmp = subpart(queryconn; path="*.2.1.:text") |> Base.Fix2(split, "\n") .|> JSON3.read
-# subpart(queryconn)
-tmp_df = let 
-    DataFrame([
-        NamedTuple(t) for t in tmp
-    ])
-end
-module mymodule end
-JSON3.@generatetypes tmp Main.mymodule
+json_out = subpart(queryconn; path="*.2.1.:text") |> Base.Fix2(split, "\n") .|> JSON3.read
+using DataFrames
+DataFrame(json_out) # because JSON3.Object support AbstractDict interface, yes it really is this easy
 
 struct Infer end
 
