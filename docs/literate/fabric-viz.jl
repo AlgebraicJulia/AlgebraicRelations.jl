@@ -7,8 +7,8 @@ using Catlab.WiringDiagrams.RelationDiagrams: UntypedNamedRelationDiagram
 
 include("examples/wineries.jl");
 
-fabric.graph
-fabric.catalog
+# fabric.graph
+# fabric.catalog
 
 using DataFrames
 
@@ -96,6 +96,42 @@ for fk in parts(fabric.catalog, :FK)
     to = only(incident(sch_acs, catalog_to_table, :pk_of))
     fk_id = add_part!(sch_acs, :FK, from=from, to=to)
     add_part!(sch_acs, :FK_Cols, fk=fk_id, fk_col=fabric.catalog[fk, :from])
+end
+
+"""
+Temporary helper fn to take catalog and make a _SQLSchema acset
+"""
+function catalog_to_SQLSchema(catalog)
+    sch_acs = @acset _SQLSchema{Symbol, DataType, Int} begin
+        Source=nparts(catalog, :Source)
+        conn=catalog[:, :conn]
+        source_id=catalog[:, :source_id]
+        #
+        Table=nparts(catalog, :Table)
+        tab_name=catalog[:, :tname]
+        source=catalog[:, :source]
+        #
+        Column=nparts(catalog, :Column)
+        col_name=catalog[:, :cname]
+        col_type=[x ∈ [:PK,:FK] ? :Integer : x for x in nameof.(catalog[:, :type])]
+        col_of=catalog[:, :table]
+    end
+
+    # add PKs
+    for pk_col in incident(catalog, PK, :type)
+        pk = add_part!(sch_acs, :PK, pk_of=catalog[pk_col, :table])
+        add_part!(sch_acs, :PK_Cols, pk=pk, pk_col=pk_col)
+    end
+
+    # add FKs
+    for fk in parts(catalog, :FK)
+        from = catalog[fk, (:from, :table)]
+        catalog_to_table = catalog[fk, (:to, :table)]
+        to = only(incident(sch_acs, catalog_to_table, :pk_of))
+        fk_id = add_part!(sch_acs, :FK, from=from, to=to)
+        add_part!(sch_acs, :FK_Cols, fk=fk_id, fk_col=catalog[fk, :from])
+    end
+    return sch_acs
 end
 
 """

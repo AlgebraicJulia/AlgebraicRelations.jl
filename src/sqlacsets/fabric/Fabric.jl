@@ -178,7 +178,7 @@ function reflect_edges!(fabric::DataFabric, es::Vector{Int})
         # check if it should be added
         check1 = incident(fabric.catalog, to, :to)
         check2 = incident(fabric.catalog, from, :from)
-        if check1 == [] && check2 == []
+        if check1 == [] || check2 == []
             add_part!(fabric.catalog, :FK, to=to, from=from)
         end
     end
