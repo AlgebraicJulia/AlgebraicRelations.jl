@@ -5,12 +5,21 @@ using ..Fabric
 using ACSets
 
 using HTTP
+using Gumbo # HTML Parsing
 
 @kwdef struct WebAPI <: AbstractDataSource
     conn::String # HTTP endpoint
+    token_envar::Union{String, Nothing} = nothing # TODO best way to store secrets?
     log::Vector{Log} = Log[]
 end
-export WebAPISource
+export WebAPI
+
+function build_headers(web::WebAPI)
+    if !isnothing(web.token_envar)
+        Dict("authorization" => "Bearer $(ENV[web.token_envar])", 
+             "accept" => "application/json;odata=verbse")
+    end
+end
 
 # objects are endpoints
 # attrs are query params
@@ -22,18 +31,6 @@ function Fabric.recatalog!(::WebAPI) end
 function Fabric.execute!(webapi::WebAPI, stmt::AbstractString; formatter=nothing)
 end
 
-function ACSetInterface.subpart(web::WebAPI, column::Symbol)
-    HTTP.get(web.conn; query=[column => column])
-end
-
-function ACSetInterface.incident(web::WebAPI, id, column::Symbol)
-end
-
-# HTTP.get(...) # select # subpart
-# HTTP.post(...) # insert
-# HTTP.put(...) # upsert
-# HTTP.delete(...)
-# HTTP.patch(...) #
-# HTTP.head(...)
+include("acset_interface.jl")
 
 end

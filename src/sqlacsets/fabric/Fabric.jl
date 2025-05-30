@@ -235,9 +235,11 @@ include("queryplanning.jl")
 
 include("datasources/database/DatabaseDS.jl")
 include("datasources/inmemory/InMemoryDS.jl")
+include("datasources/webapi/WebApiDS.jl")
 
 @reexport using .DatabaseDS
 @reexport using .InMemoryDS
+@reexport using .WebAPIDS
 
 
 end
