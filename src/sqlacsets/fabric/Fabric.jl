@@ -22,6 +22,7 @@ using FunSQL
 using FunSQL: reflect
 import FunSQL: render
 
+using PrettyTables
 using StructEquality
 using Reexport
 
@@ -235,6 +236,9 @@ include("queryplanning.jl")
 
 include("datasources/database/DatabaseDS.jl")
 include("datasources/inmemory/InMemoryDS.jl")
+
+# Custom show methods for Fabric objects
+include("show.jl")
 
 @reexport using .DatabaseDS
 @reexport using .InMemoryDS
