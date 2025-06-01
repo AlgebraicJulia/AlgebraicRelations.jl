@@ -16,7 +16,7 @@ function _empty_fabric_msg()
 
     println(Base.stdout, "\nin your REPL or code.\n")
 
-    return ["DataFabric Is Empty"] 
+    return ["Data fabric is empty"] 
 end
 
 """
@@ -74,19 +74,16 @@ function _source_summary(fabric::DataFabric)
     source_pks = [k for k in keys(subparts.type.m) if subparts.type.m[k] == PK]
     source_pks = Dict([subparts.table.m[i] for i in source_pks] .=> [String(subparts.cname[v]) for v in values(source_pks)])
 
-    source_summary = []
-    for (idx, s) in enumerate(source_keys)
-        source_info = 
-            (
-                Identifier = source_keys[s], 
-                Name = source_values[idx], 
-                PrimaryKey = source_pks[s],
-                Type = source_types[idx],
-                Fields = source_fields_count[s],
-                Indegree = source_tos_count[s],
-                Outdegree = source_froms_count[s]
-            )
-        push!(source_summary, source_info)
+    source_summary = map(enumerate(source_keys)) do (idx, s)
+        (
+            Identifier = source_keys[s], 
+            Name = source_values[idx], 
+            PrimaryKey = source_pks[s],
+            Type = source_types[idx],
+            Fields = source_fields_count[s],
+            Indegree = source_tos_count[s],
+            Outdegree = source_froms_count[s]
+        )
     end
 
     source_summary = hcat(source_summary...)
