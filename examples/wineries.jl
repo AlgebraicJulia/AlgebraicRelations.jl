@@ -44,8 +44,6 @@ climate_grape_src = add_source!(fabric, climate_grape)
 add_fk!(fabric, climate_grape_src, grape_src, :ClimateGrape!cg_grape => :Grape!Grape_id)
 add_fk!(fabric, climate_grape_src, climate_src, :ClimateGrape!cg_climate => :Climate!Climate_id)
 
-# TODO add data
-
 @present SchCountry(FreeSchema) begin
     Name::AttrType
     Country::Ob
@@ -85,6 +83,10 @@ add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Clim
 # sangiovese, merlot, trebbiano
 add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Climate}(2), cc_region=:Piedmont)
 # nebbiolo, moscato d'asti
+add_part!(fabric, :CountryClimate, cc_country=FK{Country}(3), cc_climate=FK{Climate}(3), cc_region=:NapaValley)
+add_part!(fabric, :CountryClimate, cc_country=FK{Country}(3), cc_climate=FK{Climate}(1), cc_region=:WillametteValley)
+add_part!(fabric, :CountryClimate, cc_country=FK{Country}(3), cc_climate=FK{Climate}(2), cc_region=:Sonoma)
+
 
 @present SchWine(FreeSchema) begin
     (Name, Price, Grape)::AttrType
@@ -108,6 +110,10 @@ add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(2), name=:Montepulciano) 
 add_part!(fabric, :Wine, type=:white, cultivar=FK{Grape}(1), name=:Trebbiano) # Puglia and Tuscany
 add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(2), name=:Nebbiolo) # Piedmont
 add_part!(fabric, :Wine, type=:white, cultivar=FK{Grape}(1), name=:MoscatoDAsti) # Piedmont
+##
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(2), name=:CabernetSauvignon) # name: ScreaminEagle
+add_part!(fabric, :Wine, type=:red, cultivar=FK{Grape}(2), name=:PinotNoir) # Willemette
+add_part!(fabric, :Wine, type=:white, cultivar=FK{Grape}(1), name=:SonomaChardonnay) # Sonoma
 
 @present SchWinemaker(FreeSchema) begin
     (Name, Region)::AttrType
@@ -141,8 +147,11 @@ add_part!(fabric, :Winemaker, [
     (_id=9, region=FK{CountryClimate}(3), winemaker=:GianfrancoFino),
     (_id=10,region=FK{CountryClimate}(4), winemaker=:Ornellaia),
     (_id=11,region=FK{CountryClimate}(5), winemaker=:Gaja),
-    (_id=12,region=FK{CountryClimate}(5), winemaker=:MicheleChiarlo)])
-# TODO better if auto-increment
+    (_id=12,region=FK{CountryClimate}(5), winemaker=:MicheleChiarlo),
+    # American wines
+    (_id=13,region=FK{CountryClimate}(6), winemaker=:ScreaminEagle),
+    (_id=14,region=FK{CountryClimate}(7), winemaker=:RexHill),
+    (_id=15,region=FK{CountryClimate}(8), winemaker=:Kistler)])
 
 @present SchWineWinemaker(FreeSchema) begin
     (Name, Wine, Winemaker)::AttrType
@@ -169,6 +178,10 @@ add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(8), wwm_winemaker=FK{Winemak
 add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(9), wwm_winemaker=FK{Winemaker}(11))
 add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(10), wwm_winemaker=FK{Winemaker}(12))
 
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(11), wwm_winemaker=FK{Winemaker}(13))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(12), wwm_winemaker=FK{Winemaker}(14))
+add_part!(fabric, :WineWinemaker, wwm_wine=FK{Wine}(13), wwm_winemaker=FK{Winemaker}(15))
+
 @present SchFood(FreeSchema) begin
     Name::AttrType
     Food::Ob
@@ -194,7 +207,7 @@ end
 winefood = InMemory(WineFood{FK{Wine}, FK{Food}}())
 winefood_src = add_source!(fabric, winefood)
 add_fk!(fabric, winefood_src, food_src, :WineFood!wf_food => :Food!Food_id)
-add_fk!(fabric, winefood_src, winemaker_src, :WineFood!wf_wine => :Winemaker!Winemaker_id)
+add_fk!(fabric, winefood_src, wine_src, :WineFood!wf_wine => :Wine!Wine_id)
 
 # data
 add_part!(fabric, :WineFood, wf_food=FK{Food}(1), wf_wine=FK{Wine}(1))
