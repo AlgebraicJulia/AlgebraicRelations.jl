@@ -81,7 +81,7 @@ Once this presentation is defined, the database schema can be generated as follo
 
 ```julia
 # Convert to Schema
-TrainDB = present_to_schema(present);
+@present_to_schema TrainDB(present);
 print(generate_schema_sql(TrainDB()))
 ```
 
