@@ -17,7 +17,7 @@ export WebAPISource
 
 # TODO convert FunSQL into Query Parameters
 
-function Fabric.recatalog!(::WebAPI) end
+function Fabric.reconnect!(::WebAPI) end
 
 function Fabric.execute!(webapi::WebAPI, stmt::AbstractString; formatter=nothing)
 end

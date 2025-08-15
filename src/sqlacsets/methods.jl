@@ -3,7 +3,6 @@ using .SQLACSetSyntax
 using MLStyle
 using Dates
 using DataFrames
-using FunSQL: reflect
 import FunSQL: render
 
 # VAS
@@ -28,7 +27,7 @@ export VirtualACSet
 # TODO we need to convert the `view` into an ACSet
 
 function VirtualACSet(conn::Conn) where Conn
-    c = FunSQL.DB(conn, catalog=reflect(conn))
+    c = FunSQL.DB(conn, catalog=FunSQL.reflect(conn))
     VirtualACSet{Conn}(conn=c)
 end
 
@@ -37,7 +36,7 @@ function VirtualACSet(conn::FunSQL.SQLConnection{Conn}, acs::ACSet) where Conn
 end
 
 function VirtualACSet(conn::Conn, x::ACSet) where {Conn<:DBInterface.Connection}
-    c = FunSQL.DB(conn, catalog=reflect(conn))
+    c = FunSQL.DB(conn, catalog=FunSQL.reflect(conn))
     VirtualACSet{Conn}(conn=c, schema=acset_schema(x))
 end
 

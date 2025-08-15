@@ -11,7 +11,7 @@ using MLStyle
 
 function AlgebraicRelations.reload!(source::DBSource{SQLite.DB})
     conn = SQLite.DB()
-    source.conn = FunSQL.DB(conn, catalog=reflect(conn))
+    source.conn = FunSQL.DB(conn, catalog=FunSQL.reflect(conn))
 end
 
 # TODO move to render

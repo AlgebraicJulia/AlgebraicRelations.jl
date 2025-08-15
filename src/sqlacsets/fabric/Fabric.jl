@@ -26,11 +26,15 @@ using PrettyTables
 using StructEquality
 using Reexport
 
+
 function columntypes end
 export columntypes
 
 struct PK end
 export PK
+
+get_sqlite_schema(::Any) = []
+export get_sqlite_schema
 
 # foreign key wrapper
 # TODO as_record
@@ -52,8 +56,8 @@ export to_sql
 function from_sql end
 export from_sql
 
-function recatalog! end
-export recatalog!
+function reconnect! end
+export reconnect!
 
 include("catalog.jl")
 # Data Source Graph
@@ -150,10 +154,10 @@ export catalog
 queries(fabric::DataFabric) = fabric.queries
 export queries
 
-""" pointwise recataloging of nodes """
-function recatalog!(fabric::DataFabric)
-    foreach(parts(fabric.graph, :V)) do i    
-        fabric.graph[i, :value] = recatalog!(subpart(fabric.graph, i, :value))
+""" Reconnect to all data sources on nodes """
+function reconnect!(fabric::DataFabric)
+    foreach(parts(fabric.graph, :V)) do i
+        fabric.graph[i, :value] = reconnect!(subpart(fabric.graph, i, :value))
     end
     fabric
 end
@@ -187,6 +191,9 @@ end
 
 
 # TODO don't want copy sources , TODO need idempotence
+"""
+
+"""
 function reflect!(fabric::DataFabric; source_id::Union{Int, Nothing}=nothing, edge_id::Union{Int, Nothing}=nothing)
     vs = isnothing(source_id) ? isnothing(edge_id) ? parts(fabric.graph, :V) : Int[] : [source_id]
     reflect_source!(fabric, vs)
@@ -226,7 +233,7 @@ export render
 """ """
 function execute!(fabric::DataFabric, source_id::Int, stmt)
     execute!(fabric.graph[source_id, :value], stmt)
-    # recatalog!(fabric.catalog[source_id, :conn])
+    # reconnect!(fabric.catalog[source_id, :conn])
 end
 export execute!
 

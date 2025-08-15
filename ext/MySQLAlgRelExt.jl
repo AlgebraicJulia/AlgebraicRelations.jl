@@ -6,7 +6,7 @@ using AlgebraicRelations.Schemas
 import AlgebraicRelations: tosql
 
 using FunSQL
-using FunSQL: render, reflect
+using FunSQL: render
 using MLStyle
 using MySQL
 using Tables
@@ -43,7 +43,7 @@ using Tables
 function AlgebraicRelations.reload!(source::DBSource{MySQL.Connection})
     conn = DBInterface.connect(MySQL.Connection, "localhost", "mysql", db="acsets", 
                                    unix_socket="/var/run/mysqld/mysqld.sock")
-    source.conn = FunSQL.DB(conn, catalog=reflect(conn))
+    source.conn = FunSQL.DB(conn, catalog=FunSQL.reflect(conn))
 end
 
 function tosql end

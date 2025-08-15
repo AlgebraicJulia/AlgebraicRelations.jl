@@ -4,7 +4,7 @@ using ACSets
 
 using DataFrames
 using ..Fabric
-import ..Fabric: recatalog!, columntypes
+import ..Fabric: reconnect!, columntypes
 
 # this is an ACSet
 mutable struct InMemory <: AbstractDataSource
@@ -31,8 +31,8 @@ function Fabric.columntypes(x::ACSet)
     Dict([name => attrtype_mapping[attrtype] for (name, _, attrtype) in acset_schema(x).attrs]...)
 end
 
-function recatalog!(m::InMemory); m end
-export recatalog!
+function reconnect!(m::InMemory); m end
+export reconnect!
 
 function DenseACSets.acset_schema(m::InMemory)
     acset_schema(m.value)
@@ -50,7 +50,7 @@ function ACSetInterface.add_parts!(m::InMemory, args...)
     add_parts!(m.value, args...)
 end
 
-function ACSetInterface.subpart(m::InMemory, Colon, tablecolumn::Pair{Symbol, Symbol})
+function ACSetInterface.subpart(m::InMemory, ::Colon, tablecolumn::Pair{Symbol, Symbol})
     df = DataFrame()
     result = subpart(m.value, :, tablecolumn.second)
     df[!, tablecolumn.second] = result isa AbstractVector ? result : [result]

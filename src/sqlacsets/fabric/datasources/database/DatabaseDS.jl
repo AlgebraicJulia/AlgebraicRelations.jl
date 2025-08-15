@@ -4,14 +4,14 @@ using ACSets
 using ..SQLACSetSyntax
 using ..SQLACSetSyntax: AbstractSQLTerm 
 using ..Fabric
-import ..Fabric: execute!
+import ..Fabric: execute!, reconnect!, columntypes
 
 using MLStyle
 using DBInterface
 using DataFrames
 
 using FunSQL
-using FunSQL: SQLTable, reflect
+using FunSQL: SQLTable
 using FunSQL: Select, From, Where, Agg, Group, Fun, Get
 using FunSQL: FROM, SELECT, WHERE, FUN
 
@@ -39,27 +39,27 @@ function Fabric.columntypes(source::DBSource)
     ])
 end
 
-function Fabric.recatalog!(source::DBSource)
-    source.conn = FunSQL.DB(source.conn.raw, catalog=reflect(source.conn.raw))
+function Fabric.reconnect!(source::DBSource)
+    source.conn = FunSQL.DB(source.conn.raw, catalog=FunSQL.reflect(source.conn.raw))
     source
 end
-export recatalog!
+export reconnect!
 
-function Fabric.execute!(db::DBSource, stmt::AbstractString; formatter=DataFrame)
+function Fabric.execute!(db::DBSource, stmt::AbstractString, formatter=DataFrame)
     result = DBInterface.execute(db.conn.raw, stmt)
-    recatalog!(db)
+    reconnect!(db)
     isnothing(formatter) && return result
     formatter(result)
 end
 
 # TODO could probably implement `isDML(::AbstractSQLTerm) = true` for types that are
-function Fabric.execute!(db::DBSource, stmt::AbstractSQLTerm; formatter=DataFrame)
+function Fabric.execute!(db::DBSource, stmt::AbstractSQLTerm, formatter=DataFrame)
     # @match statement because of DBInterface.execute
     result = @match stmt begin
         ::ACSetInsert || ::ACSetUpdate => DBInterface.execute(db.conn.raw, render(db, stmt))
         _ => DBInterface.execute(db.conn, render(db, stmt))
     end
-    recatalog!(db)
+    reconnect!(db)
     isnothing(formatter) && return result
     formatter(result)
 end
