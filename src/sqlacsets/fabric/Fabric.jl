@@ -14,6 +14,8 @@ using Catlab
 using Catlab.Graphics.Graphviz
 using ACSets
 
+using TraitInterfaces: @instance
+
 using MLStyle: @match, @as_record
 using Dates
 using DataFrames
@@ -55,9 +57,6 @@ export to_sql
 
 function from_sql end
 export from_sql
-
-function reconnect! end
-export reconnect!
 
 include("catalog.jl")
 # Data Source Graph
@@ -137,6 +136,23 @@ struct Log
 end
 export Log
 
+using TraitInterfaces
+import Catlab: ACSet
+
+# TODO derive as a trait
+
+@interface ThDataSource begin
+    @import ACSet::TYPE
+    @import Vector::TYPE
+    @import AbstractString::TYPE
+    Source::TYPE # Type of data 
+    reconnect!(s::Source)::Source
+    # incident(s::Source, r::Row, c::Column)::Vector{Row}
+    execute!(d::Source, stmt::AbstractString)::ACSet # TODO stmt, formatter
+    schema(d::Source)::ACSet
+end
+export ThDataSource, reconnect!, execute!
+
 @kwdef mutable struct DataFabric
     # this will store the connections, their schema, and values
     graph::DataSourceGraph = DataSourceGraph()
@@ -154,12 +170,30 @@ export catalog
 queries(fabric::DataFabric) = fabric.queries
 export queries
 
-""" Reconnect to all data sources on nodes """
-function reconnect!(fabric::DataFabric)
-    foreach(parts(fabric.graph, :V)) do i
-        fabric.graph[i, :value] = reconnect!(subpart(fabric.graph, i, :value))
+function trait end
+
+struct FabricTrait end 
+trait(::DataFabric) = FabricTrait()
+
+TraitInterfaces.@instance ThDataSource{Source=DataFabric} [model::FabricTrait] begin
+    """ Reconnect to all data sources on nodes """
+    function reconnect!(fabric::DataFabric)
+        foreach(parts(fabric.graph, :V)) do i
+            value = subpart(fabric.graph, i, :value)
+            τ = trait(value) 
+            fabric.graph[i, :value] = reconnect![τ](value)
+        end
+        fabric
     end
-    fabric
+    """ TODO """
+    function execute!(fabric::DataFabric, stmt::AbstractString)
+        # execute!(fabric.graph[source_id, :value], stmt)
+        nothing
+    end
+    """ TODO """
+    function schema(fabric::DataFabric)
+        nothing
+    end
 end
 
 function reflect_source!(fabric::DataFabric, vs::Vector{Int})
@@ -230,12 +264,6 @@ export add_fk!
 function render end
 export render
 
-""" """
-function execute!(fabric::DataFabric, source_id::Int, stmt)
-    execute!(fabric.graph[source_id, :value], stmt)
-    # reconnect!(fabric.catalog[source_id, :conn])
-end
-export execute!
 
 # ACSet Interface for the Fabric. It determines which data source to dispatch the ACSet function on
 include("acset_interface.jl")

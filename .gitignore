@@ -27,3 +27,6 @@ Manifest.toml
 .DS_Store
 .vscode
 .ipynb_checkpoints
+
+# Helix editor
+**/.helix/
