@@ -36,7 +36,8 @@ classes = Class{Symbol}()
 
 using SQLite, DBInterface
 class_db = DBSource(SQLite.DB(), acset_schema(classes))
-execute!(class_db, "create table `Class` (_id int, subject varchar(255))")
+τ = AlgebraicRelations.Fabric.DatabaseDS.DBSourceTrait()
+execute![τ](class_db, "create table `Class` (_id int, subject varchar(255))")
 
 # ...but they are stored in different data sources. Let's suppose we have
 # a many-many relationship of students and classes. Here is their membership:
@@ -51,7 +52,7 @@ add_parts!(students_acset, :Student, length(keys(df)), name=keys(df))
 subpart(students_acset.value, :name)
 
 # ...and classes...
-execute!(class_db,
+execute![τ](class_db,
     """insert or ignore into `class` (_id, subject) values
     (1, "Math"), (2, "Philosophy"), (3, "Music"),
     (4, "Cooking"), (5, "CompSci"), (6, "Gym"), (7, "Art")

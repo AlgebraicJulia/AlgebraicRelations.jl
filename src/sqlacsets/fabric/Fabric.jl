@@ -14,6 +14,8 @@ using Catlab
 using Catlab.Graphics.Graphviz
 using ACSets
 
+using TraitInterfaces: @instance
+
 using MLStyle: @match, @as_record
 using Dates
 using DataFrames
@@ -26,11 +28,15 @@ using PrettyTables
 using StructEquality
 using Reexport
 
+
 function columntypes end
 export columntypes
 
 struct PK end
 export PK
+
+get_sqlite_schema(::Any) = []
+export get_sqlite_schema
 
 # foreign key wrapper
 # TODO as_record
@@ -51,9 +57,6 @@ export to_sql
 
 function from_sql end
 export from_sql
-
-function recatalog! end
-export recatalog!
 
 include("catalog.jl")
 # Data Source Graph
@@ -133,6 +136,23 @@ struct Log
 end
 export Log
 
+using TraitInterfaces
+import Catlab: ACSet
+
+# TODO derive as a trait
+
+@interface ThDataSource begin
+    @import ACSet::TYPE
+    @import Vector::TYPE
+    @import AbstractString::TYPE
+    Source::TYPE # Type of data 
+    reconnect!(s::Source)::Source
+    # incident(s::Source, r::Row, c::Column)::Vector{Row}
+    execute!(d::Source, stmt::AbstractString)::ACSet # TODO stmt, formatter
+    schema(d::Source)::ACSet
+end
+export ThDataSource, reconnect!, execute!
+
 @kwdef mutable struct DataFabric
     # this will store the connections, their schema, and values
     graph::DataSourceGraph = DataSourceGraph()
@@ -150,12 +170,31 @@ export catalog
 queries(fabric::DataFabric) = fabric.queries
 export queries
 
-""" pointwise recataloging of nodes """
-function recatalog!(fabric::DataFabric)
-    foreach(parts(fabric.graph, :V)) do i    
-        fabric.graph[i, :value] = recatalog!(subpart(fabric.graph, i, :value))
+function trait end
+export trait
+
+struct FabricTrait end 
+trait(::DataFabric) = FabricTrait()
+
+TraitInterfaces.@instance ThDataSource{Source=DataFabric} [model::FabricTrait] begin
+    """ Reconnect to all data sources on nodes """
+    function reconnect!(fabric::DataFabric)
+        foreach(parts(fabric.graph, :V)) do i
+            value = subpart(fabric.graph, i, :value)
+            τ = trait(value) 
+            fabric.graph[i, :value] = reconnect![τ](value)
+        end
+        fabric
     end
-    fabric
+    """ TODO """
+    function execute!(fabric::DataFabric, stmt::AbstractString)
+        # execute!(fabric.graph[source_id, :value], stmt)
+        nothing
+    end
+    """ TODO """
+    function schema(fabric::DataFabric)
+        nothing
+    end
 end
 
 function reflect_source!(fabric::DataFabric, vs::Vector{Int})
@@ -187,6 +226,9 @@ end
 
 
 # TODO don't want copy sources , TODO need idempotence
+"""
+
+"""
 function reflect!(fabric::DataFabric; source_id::Union{Int, Nothing}=nothing, edge_id::Union{Int, Nothing}=nothing)
     vs = isnothing(source_id) ? isnothing(edge_id) ? parts(fabric.graph, :V) : Int[] : [source_id]
     reflect_source!(fabric, vs)
@@ -223,12 +265,6 @@ export add_fk!
 function render end
 export render
 
-""" """
-function execute!(fabric::DataFabric, source_id::Int, stmt)
-    execute!(fabric.graph[source_id, :value], stmt)
-    # recatalog!(fabric.catalog[source_id, :conn])
-end
-export execute!
 
 # ACSet Interface for the Fabric. It determines which data source to dispatch the ACSet function on
 include("acset_interface.jl")

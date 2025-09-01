@@ -3,6 +3,7 @@ using Catlab
 using AlgebraicRelations
 using SQLite, DBInterface
 
+τ = AlgebraicRelations.Fabric.DatabaseDS.DBSourceTrait()
 fabric = DataFabric()
 
 @present SchClimate(FreeSchema) begin
@@ -127,8 +128,7 @@ winemakers = Winemaker{Symbol, FK{CountryClimate}}()
 winemaker_db = DBSource(SQLite.DB(), acset_schema(winemakers))
 
 # load table
-import FunSQL: render
-execute!(winemaker_db, render(winemaker_db, winemakers))
+execute![τ](winemaker_db, FunSQL.render(winemaker_db, winemakers))
 # add to fabric
 winemaker_src = add_source!(fabric, winemaker_db, :Winemaker)
 add_fk!(fabric, winemaker_src, country_climate_src, :Winemaker!region => :CountryClimate!CountryClimate_id)

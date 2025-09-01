@@ -1,10 +1,11 @@
 module InMemoryDS
 
 using ACSets
+using TraitInterfaces
 
 using DataFrames
 using ..Fabric
-import ..Fabric: recatalog!, columntypes
+import ..Fabric: trait, columntypes
 
 # this is an ACSet
 mutable struct InMemory <: AbstractDataSource
@@ -19,24 +20,29 @@ mutable struct InMemory <: AbstractDataSource
 end
 export InMemory
 
-Base.nameof(m::InMemory) = nameof(m.value)
+struct InMemoryTrait end
+trait(::InMemory) = InMemoryTrait()
 
-Base.nameof(x::ACSet) = nameof(typeof(x))
+TraitInterfaces.@instance ThDataSource{Source=InMemory} [model::InMemoryTrait] begin 
+    reconnect!(m::InMemory)::InMemory = m
+    execute!(m::InMemory, stmt::AbstractString)::Vector{Int} = Int[]
+    schema(m::InMemory) = DenseACSets.acset_schema(value)
+end
+
+Base.nameof(m::InMemory) = nameof(typeof(m.value))
 
 Fabric.columntypes(m::InMemory) = columntypes(m.value)
 
+# TODO migrate to ACSets
 function Fabric.columntypes(x::ACSet)
     schema = acset_schema(x)
     attrtype_mapping = Dict([col => type for (col, type) in zip(attrtypes(schema), [typeof(x).parameters...])])
     Dict([name => attrtype_mapping[attrtype] for (name, _, attrtype) in acset_schema(x).attrs]...)
 end
 
-function recatalog!(m::InMemory); m end
-export recatalog!
-
-function DenseACSets.acset_schema(m::InMemory)
-    acset_schema(m.value)
-end
+# function DenseACSets.acset_schema(m::InMemory)
+#     acset_schema(m.value)
+# end
 
 function ACSetInterface.nparts(m::InMemory, args...)
     nparts(m.value, args...)
@@ -50,7 +56,7 @@ function ACSetInterface.add_parts!(m::InMemory, args...)
     add_parts!(m.value, args...)
 end
 
-function ACSetInterface.subpart(m::InMemory, Colon, tablecolumn::Pair{Symbol, Symbol})
+function ACSetInterface.subpart(m::InMemory, ::Colon, tablecolumn::Pair{Symbol, Symbol})
     df = DataFrame()
     result = subpart(m.value, :, tablecolumn.second)
     df[!, tablecolumn.second] = result isa AbstractVector ? result : [result]

@@ -9,6 +9,7 @@ function decide_source(fabric::DataFabric, attr::Pair{Symbol, Tuple{Symbol, Symb
     subpart(fabric.graph, source_id, :value)
 end
 
+# Pair is tablename, col name
 function decide_source(fabric::DataFabric, attr::Pair{Symbol, Symbol})
     id = incident(fabric.catalog, attr.second, attr.first)
     if attr.first == :cname
