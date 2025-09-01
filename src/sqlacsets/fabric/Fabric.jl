@@ -171,6 +171,7 @@ queries(fabric::DataFabric) = fabric.queries
 export queries
 
 function trait end
+export trait
 
 struct FabricTrait end 
 trait(::DataFabric) = FabricTrait()

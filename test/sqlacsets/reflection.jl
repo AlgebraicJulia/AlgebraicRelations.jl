@@ -4,6 +4,8 @@ using ACSets
 using Catlab
 using AlgebraicRelations
 
+τ = AlgebraicRelations.Fabric.DatabaseDS.DBSourceTrait()
+
 @testset "Wine" begin
 
     fabric = DataFabric()
@@ -50,7 +52,7 @@ end
     class_db = DBSource(SQLite.DB(), acset_schema(classes))
 
     using FunSQL
-    execute!(class_db, FunSQL.render(class_db, classes))
+    execute![τ](class_db, FunSQL.render(class_db, classes))
     # execute!(class_db, "create table `Class` (_id int, subject varchar(255))")
 
     class_src = add_source!(fabric, class_db)
@@ -79,7 +81,7 @@ end
     rainbow_db = DBSource(SQLite.DB(), acset_schema(rainbow))
 
     using FunSQL
-    execute!(rainbow_db, FunSQL.render(rainbow_db, rainbow)) 
+    execute![τ](rainbow_db, FunSQL.render(rainbow_db, rainbow)) 
 
     rainbow_src = add_source!(fabric, rainbow_db)
 

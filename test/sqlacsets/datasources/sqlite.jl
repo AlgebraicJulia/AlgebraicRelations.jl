@@ -8,6 +8,8 @@ using Test
 using DataFrames
 using SQLite, DBInterface
 
+τ = AlgebraicRelations.Fabric.DatabaseDS.DBSourceTrait()
+
 @present SchClass(FreeSchema) begin
     Name::AttrType
     Class::Ob
@@ -17,7 +19,7 @@ end
 classes = Class{Symbol}()
 
 class_db = DBSource(SQLite.DB(), acset_schema(classes))
-execute!(class_db, "create table `Class` (_id int, subject varchar(255))")
+execute![τ](class_db, "create table `Class` (_id int, subject varchar(255))")
 
 @test columntypes(class_db) == Dict([:_id => Integer, :subject => String])
 

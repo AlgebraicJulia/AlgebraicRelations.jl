@@ -24,7 +24,7 @@ end
 export DBSource
 
 function DBSource(conn::Conn, schema=nothing) where Conn
-    funconn = FunSQL.DB(conn, catalog=reflect(conn))
+    funconn = FunSQL.DB(conn, catalog=FunSQL.reflect(conn))
     DBSource{Conn}(schema=schema, conn=funconn)
 end
 
@@ -38,9 +38,9 @@ TraitInterfaces.@instance ThDataSource{Source=DBSource} [model::DBSourceTrait] b
     end
     function execute!(source::DBSource, stmt::AbstractString)
         result = DBInterface.execute(source.conn.raw, stmt)
-        reconnect!(source)
-        # DataFrame(result)
-        nothing 
+        reconnect![model](source)
+        DataFrame(result)
+        # nothing 
     end
     function schema(source::DBSource)
         source.schema
