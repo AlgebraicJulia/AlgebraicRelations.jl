@@ -27,6 +27,7 @@ TraitInterfaces.@instance ThDataSource{Source=InMemory} [model::InMemoryTrait] b
     reconnect!(m::InMemory)::InMemory = m
     execute!(m::InMemory, stmt::AbstractString)::Vector{Int} = Int[]
     schema(m::InMemory) = DenseACSets.acset_schema(value)
+    upload(m::InMemory, table::AbstractString, filename::AbstractString) = nothing # TODO
 end
 
 Base.nameof(m::InMemory) = nameof(typeof(m.value))
@@ -40,9 +41,9 @@ function Fabric.columntypes(x::ACSet)
     Dict([name => attrtype_mapping[attrtype] for (name, _, attrtype) in acset_schema(x).attrs]...)
 end
 
-# function DenseACSets.acset_schema(m::InMemory)
-#     acset_schema(m.value)
-# end
+function DenseACSets.acset_schema(m::InMemory)
+    acset_schema(m.value)
+end
 
 function ACSetInterface.nparts(m::InMemory, args...)
     nparts(m.value, args...)
@@ -83,6 +84,29 @@ function ACSetInterface.incident(m::InMemory, parts, f::T; formatter=identity) w
     out = intersect([incident(m, parts[i], f[i]) for i in eachindex(f)]...)
     formatter(out)
 end
+
+function getattrs(m::InMemory, table::Symbol)
+    first.(filter(attrs(acset_schema(m))) do (attr, tbl, _)
+        table == tbl
+    end)
+end
+export getattrs
+
+function gethoms(m::InMemory, table::Symbol)
+    first.(homs(acset_schema(m); from=table))
+end
+export gethoms
+
+# FIXME Set
+function colnames(x::ACSet, table::Symbol)
+    homnames = first.(homs(acset_schema(x); from=table))
+    gattrs = getattrs(x, table)
+    # I don't like this as it assumes the order of the columns would agree
+    cols = [:_id, (homnames ∪ gattrs)...]
+    """($(join(cols, ", ")))"""
+end
+export colnames
+
 
 
 end

@@ -45,6 +45,9 @@ TraitInterfaces.@instance ThDataSource{Source=DBSource} [model::DBSourceTrait] b
     function schema(source::DBSource)
         source.schema
     end
+    function upload(source::DBSource, table::AbstractString, filename::AbstractString)
+        nothing # TODO
+    end
 end
 
 Base.nameof(source::DBSource) = nothing
@@ -58,10 +61,10 @@ function Fabric.columntypes(source::DBSource)
 end
 
 # TODO could probably implement `isDML(::AbstractSQLTerm) = true` for types that are
-function Fabric.execute!(db::DBSource, stmt::AbstractSQLTerm, formatter=DataFrame)
+function Fabric.execute!(db::DBSource, stmt::Union{DML, AbstractString}, formatter=DataFrame)
     # @match statement because of DBInterface.execute
     result = @match stmt begin
-        ::ACSetInsert || ::ACSetUpdate => DBInterface.execute(db.conn.raw, render(db, stmt))
+        ::DML => DBInterface.execute(db.conn.raw, render(db, stmt))
         _ => DBInterface.execute(db.conn, render(db, stmt))
     end
     reconnect!(db)
