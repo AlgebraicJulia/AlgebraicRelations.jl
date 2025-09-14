@@ -1,3 +1,5 @@
+module Catalog
+
 # CATALOG
 emptyMaybe(x) = isempty(x) ? nothing : Some(x)
 
@@ -22,6 +24,34 @@ export Catalog
 function (c::Catalog)(value)
     add_part!(c, :Source, conn=Memory(value))
     c
+end
+
+# TODO get_fields from Schemas
+"""    Catalog(p::Presentation; types::Union{Dict, Nothing}=nothing)
+"""
+function Catalog(p::Presentation; types::Union{Dict, Nothing}=nothing)
+    catalog = Catalog()
+    fields = get_fields(p, types)
+    tables = keys(fields)
+    table_to_index = Dict{Symbol, Int64}()
+    for table in tables
+        table_idx = add_part!(catalog, :Table, tname="$table")
+        add_part!(catalog, :Column, table_idx, cname="$(table)_id", type="TODO")
+        table_to_index[table] = table_idx
+    end
+    # ingest columns
+    for table in tables
+        table_idx = only(incident(catalog, "$table", :tname))
+        for column in fields[table]
+            if column[1] == :Hom
+                column_idx = add_part!(catalog, :Column, table = table_idx, cname = "$(column[3])", type="TODO")
+                add_part!(catalog, :FK, to=column_idx, from=table_to_index[column[2]])
+            else
+                type = SQLType(column[2])
+                add_part!(catalog, table = table_idx, cnmame = "$(c[3])", type=type)
+            end
+        end
+    end
 end
 
 function table_to_fields(s::SQLSchema{T}) where T
@@ -85,3 +115,4 @@ end
 #     out
 # end
 
+end

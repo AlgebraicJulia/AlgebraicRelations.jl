@@ -10,30 +10,26 @@ using DataFrames
 using SQLite
 using FunSQL: render, SQLDialect
 
-@present Business(FreeSchema) begin
-    (val!Salary, Name)::AttrType
+fabric = DataFabric()
+
+@present SchBusiness(FreeSchema) begin
+    (Salary, Name)::AttrType
     (Employee, Manager, Income, Salary)::Ob
     name::Attr(Employee, Name)
-    #
-    (man!employee, man!manager)::Hom(Manager, Employee)
-    #
-    inc!employee::Hom(Income, Employee)
-    inc!salary::Hom(Income, Salary)
-    #
-    sal!salary::Attr(Salary, val!Salary)
+    (employee, manager)::Hom(Manager, Employee)
+    employee::Hom(Income, Employee)
+    salary::Hom(Income, Salary)
+    salary::Attr(Salary, Salary)
 end
-
-busSchema = SQLSchema(Business; types = Dict(:val!Salary => Float64, :Name => String))
-
-
-
+@acset_type Business(SchBusiness)
+business = InMemory(Business{Int, Symbol})
+fabric = add_source!(fabric, business)
 
 @testset "Generate DB Schema" begin
-  
-for stmt in splt_stmts
-    @test execute!(vas, stmt) isa SQLite.Query
-end
-
+    # TODO break Business part of fabric into INSERT statments
+    for stmt in splt_stmts
+        @test execute!(vas, stmt) isa SQLite.Query
+    end
 end
 
 insert_stmts = [
@@ -55,7 +51,7 @@ insert_stmts = [
     "INSERT OR IGNORE INTO income   (employee, salary, id)    VALUES (4, 4, 4);"];
 
 for stmt in insert_stmts
-    DBInterface.execute(db, stmt)
+    execute(fabric, stmt)
 end
 
 tab = SQLTable(busSchema)

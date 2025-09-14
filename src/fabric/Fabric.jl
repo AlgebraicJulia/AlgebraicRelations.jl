@@ -1,8 +1,3 @@
-module Fabric
-
-using ...Schemas
-using ..SQLACSetSyntax
-
 # The DataFabric is an edge-labeled graph of data sources and schema-schema interrelations
 # which implements the ACSet interface. It may "virtualize" data by querying it
 # into memory.
@@ -10,6 +5,13 @@ using ..SQLACSetSyntax
 # ## Colimiting: 
 # If all the data sources have known database schema, then we can assembly the
 # data into a single ACSet schema.
+module Fabric
+
+using ...Schemas
+using ..SQLACSetSyntax
+
+using Reexport
+
 using Catlab
 using Catlab.Graphics.Graphviz
 using ACSets
@@ -26,17 +28,14 @@ import FunSQL: render
 
 using PrettyTables
 using StructEquality
-using Reexport
 
+include("catalog.jl")
 
 function columntypes end
 export columntypes
 
 struct PK end
 export PK
-
-get_sqlite_schema(::Any) = []
-export get_sqlite_schema
 
 # foreign key wrapper
 # TODO as_record
@@ -58,7 +57,6 @@ export to_sql
 function from_sql end
 export from_sql
 
-include("catalog.jl")
 # Data Source Graph
 
 # TODO move to Catlab. This is a labeled graph whose edges are also labeled
@@ -103,39 +101,6 @@ function Catlab.Graphics.Graphviz.view_graphviz(g::DataSourceGraph)
 end
 export view_graphviz
 
-# TODO change Any to AbstractResult
-QueryResultDSGraph = DataSourceGraph{Symbol, Union{DataFrame, Nothing}, Symbol}
-
-struct QueryResultWrapper
-    qg::QueryResultDSGraph
-    # query
-end
-export QueryResultWrapper
-
-function QueryResultWrapper(g::DataSourceGraph)
-    qg = QueryResultDSGraph()
-    add_parts!(qg, :V, nparts(g, :V), label=subpart(g, :label))
-    edges = parts(g, :E)
-    for e in edges
-        foot1 = subpart(g, e, :src)
-        foot2 = subpart(g, e, :tgt)
-        label1 = subpart(g, foot1, :label)
-        label2 = subpart(g, foot2, :label)
-        apex = add_part!(qg, :V, label=Symbol("$label1⨝$label2"))
-        add_parts!(qg, :E, 2, src=[apex, apex], tgt=[foot1, foot2], edgelabel=[label1, label2])
-    end
-    QueryResultWrapper(qg)
-end
-export QueryResultWrapper
-
-# DataFabric
-struct Log
-    time::DateTime
-    event
-    Log(event::DataType) = new(Dates.now(), event)
-end
-export Log
-
 using TraitInterfaces
 import Catlab: ACSet
 
@@ -143,15 +108,20 @@ import Catlab: ACSet
 
 @interface ThDataSource begin
     @import ACSet::TYPE
+    @import Presentation::TYPE
     @import Vector::TYPE
     @import AbstractString::TYPE
     Source::TYPE # Type of data 
     reconnect!(s::Source)::Source
     # incident(s::Source, r::Row, c::Column)::Vector{Row}
     execute!(d::Source, stmt::AbstractString)::ACSet # TODO stmt, formatter
-    schema(d::Source)::ACSet
+    # This retrieves the source schema in terms of an ACSet
+    schema(d::Source)::Presentation
+    # Upload structured data into source. TODO should return result
+    upload(d::Source, table::AbstractString, filename::AbstractString)::AbstractString
 end
 export ThDataSource, reconnect!, execute!
+# LibPQ.execute(conn, "COPY '$table' FROM '$filename' DELIMITER ',' CSV HEADER;")
 
 @kwdef mutable struct DataFabric
     # this will store the connections, their schema, and values
@@ -170,6 +140,7 @@ export catalog
 queries(fabric::DataFabric) = fabric.queries
 export queries
 
+# TODO should not export generic name like `trait`
 function trait end
 export trait
 
@@ -194,6 +165,9 @@ TraitInterfaces.@instance ThDataSource{Source=DataFabric} [model::FabricTrait] b
     """ TODO """
     function schema(fabric::DataFabric)
         nothing
+    end
+    """ TODO """
+    function upload(d::Source, tabke::AbstractString, filename::AbstractString)
     end
 end
 
@@ -259,16 +233,31 @@ end
 export add_fk!
 
 
+struct PagingInfo 
+    startIndex::Int
+    batchSize::Union{Int, Nothing}
+end
+
+# DataFabric
+struct Log
+    time::DateTime
+    event
+    Log(event::DataType) = new(Dates.now(), event)
+end
+export Log
+
+
 # Executing commands on data fabric
 
 """ """
 function render end
 export render
 
-
 # ACSet Interface for the Fabric. It determines which data source to dispatch the ACSet function on
 include("acset_interface.jl")
-include("queryplanning.jl")
+
+# query
+include("query/Query.jl")
 
 include("datasources/database/DatabaseDS.jl")
 include("datasources/inmemory/InMemoryDS.jl")

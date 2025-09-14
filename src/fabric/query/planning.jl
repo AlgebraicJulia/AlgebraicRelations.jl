@@ -23,7 +23,6 @@ function Base.getindex(iter::PairIterator, idx::Int64)
     idx ≤ length(iter) ? Tuple(iter.data[idx:idx+1]) : throw(BoundsError(length(iter), idx))
 end
 Base.lastindex(iter::PairIterator) = length(iter)
-# iter[i:j]
 
 function arity(diag::UntypedNamedRelationDiagram, i::Int, label::Symbol=:junction)
     length(incident(diag, i, label))

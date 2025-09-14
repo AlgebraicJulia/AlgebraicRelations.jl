@@ -2,6 +2,8 @@
 # # ACSets Interface
 # ####################
 
+# TODO DML / DML
+
 # get the number of rows
 function ACSetInterface.nparts(db::DBSource, table::Symbol; formatter=identity)
     query = From(table) |> Group() |> Select(Agg.count())
@@ -87,7 +89,7 @@ end
 # add_part!
 
 function ACSetInterface.add_part!(db::DBSource, table::Symbol, values::Vector{<:NamedTuple{T}}) where T 
-    execute!(db, ACSetInsert(table, values))
+    execute!(db, DML(table, values))
 end
 
 function ACSetInterface.add_part!(db::DBSource, table, value::NamedTuple{T}) where T
@@ -98,7 +100,7 @@ end
 
 function ACSetInterface.set_subpart!(db::DBSource, 
         table::Symbol, values::Vector{<:NamedTuple{T}}; wheres::Union{WhereClause, Nothing}=nothing) where T 
-    query = execute!(db, ACSetUpdate(table, values, wheres))
+    query = execute!(db, DML(table, values, wheres))
     df = DataFrames.DataFrame(query); metadata!(df, "ob", table, style=:note)
     df
 end
