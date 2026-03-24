@@ -2,18 +2,22 @@
 # # ACSets Interface
 # ####################
 
+import Catlab.ACSetInterface: nparts, maxpart, subpart, incident, add_part!, set_subpart!, clear_subpart!, rem_part!, rem_parts!, cascading_rem_part1
+
 # get the number of rows
-function ACSetInterface.nparts(db::DBSource, table::Symbol; formatter=identity)
+# TODO incorporate formatter
+function nparts(db::DBSource, table::Symbol; formatter=identity)
     query = From(table) |> Group() |> Select(Agg.count())
     DBInterface.execute(db.conn, query) |> DataFrames.DataFrame |> Base.Fix2(getproperty, :count) |> only
 end
 
-function ACSetInterface.maxpart(db::DBSource, table::Symbol) 
+function maxpart(db::DBSource, table::Symbol) 
     query = From(table) |> Group() |> Select(Agg.max(:_id))
     DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
 
-function ACSetInterface.subpart(db::DBSource, column::Symbol)
+# TODO add formatter
+function subpart(db::DBSource, column::Symbol)
     table = tablefromcolumn(db, column)
     query = FROM(table) |> SELECT(*) 
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
@@ -24,33 +28,33 @@ end
 function tablefromcolumn(db::DBSource, column::Symbol)
     # TODO here we are using the local catalog.
     indices = map(values(db.conn.catalog.tables)) do table
-        haskey(table.columns, column)
+        column == table.name || haskey(table.columns, column)
     end
     !isempty(indices) || return nothing
     collect(keys(db.conn.catalog.tables))[findfirst(indices)]
 end
 
 # TODO we should be table to get the primary key from the catalog. for SQLite, we can get the primary key 
-function ACSetInterface.subpart(db::DBSource, ks::Vector{Int}, column::Symbol)
+function subpart(db::DBSource, ks::Vector{Int}, column::Symbol)
     table = tablefromcolumn(db, column)
     subpart(db, ks, table => column)
 end
 
-function ACSetInterface.subpart(db::DBSource, key::Int, column::Symbol)
+function subpart(db::DBSource, key::Int, column::Symbol)
     subpart(db, [key], column)
 end
 
-function ACSetInterface.subpart(db::DBSource, ks::Vector{Int}, tablecolumn::Pair{Symbol, Symbol})
+function subpart(db::DBSource, ks::Vector{Int}, tablecolumn::Pair{Symbol, Symbol})
     query = FROM(tablecolumn.first) |> WHERE(FUN("in", :_id, ks...)) |> SELECT(tablecolumn.second)
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
 
-function ACSetInterface.subpart(db::DBSource, ::Colon, tablecolumn::Pair{Symbol, Symbol})
+function subpart(db::DBSource, ::Colon, tablecolumn::Pair{Symbol, Symbol})
     query = FROM(tablecolumn.first) |> SELECT(tablecolumn.second)
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
 
-function ACSetInterface.subpart(db::DBSource, ::Colon, column::Symbol)
+function subpart(db::DBSource, ::Colon, column::Symbol)
     query = FROM(table) |> SELECT(column)
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
@@ -58,60 +62,59 @@ end
 
 # incident
 
-function ACSetInterface.incident(db::DBSource, vals::Vector, tablecolumn::Pair{Symbol, Symbol})
+function incident(db::DBSource, vals::Vector, tablecolumn::Pair{Symbol, Symbol})
     query = FROM(tablecolumn.first) |> WHERE(FUN(:in, tablecolumn.second, vals...)) |> SELECT(:_id)
     # query = From(tablecolumn.first) |> Select(:_id) TODO document why this is not permitted
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
 
-function ACSetInterface.incident(db::DBSource, val::Symbol, tablecolumn::Pair{Symbol, Symbol})
+function incident(db::DBSource, val::Symbol, tablecolumn::Pair{Symbol, Symbol})
     incident(db, [val], tablecolumn)
 end
 
 # TODO names::Vector{Symbol}
-function ACSetInterface.incident(db::DBSource, vals::Vector, column::Symbol)
+function incident(db::DBSource, vals::Vector, column::Symbol)
     table = tablefromcolumn(db, column)
     query = FROM(table) |> WHERE(FUN("in", column, vals...)) |> SELECT(:_id)
     df = DBInterface.execute(db.conn, query) |> DataFrames.DataFrame
 end
 
-function ACSetInterface.incident(db::DBSource, val::Symbol, column::Symbol)
-    incident(db, [val], column)
-end
-
-# function ACSetInterface.incident(db::DBSource, table::Symbol, names::AbstractVector{Symbol}) 
-#     nst = namesrctgt(acset_schema(db.acsettype()))
-#     table = nst[names]
-# end
+incident(db::DBSource, val::Symbol, column::Symbol) = incident(db, [val], column)
 
 # add_part!
 
-function ACSetInterface.add_part!(db::DBSource, table::Symbol, values::Vector{<:NamedTuple{T}}) where T 
-    execute!(db, ACSetInsert(table, values))
+# TODO
+function add_part!(db::DBSource, table::Symbol, values::Vector{<:NamedTuple{T}}) where T
+    τ = trait(db)
+    stmt = render(db, SQL.Syntax.Insert(table, values))
+    execute![τ](db, stmt)
 end
 
-function ACSetInterface.add_part!(db::DBSource, table, value::NamedTuple{T}) where T
+function add_part!(db::DBSource, table, value::NamedTuple{T}) where T
     add_part!(db, table, [value])
 end
 
 # set_subpart!
 
-function ACSetInterface.set_subpart!(db::DBSource, 
-        table::Symbol, values::Vector{<:NamedTuple{T}}; wheres::Union{WhereClause, Nothing}=nothing) where T 
-    query = execute!(db, ACSetUpdate(table, values, wheres))
+# TODO
+# TODO change to Maybe
+function set_subpart!(db::DBSource, 
+        table::Symbol, values::Vector{<:NamedTuple{T}}; wheres::Union{Syntax.WhereClause, Nothing}=nothing) where T
+    stmt = render(db, Update(table, values, wheres))
+    τ = trait(db)
+    # TODO would be nice for execute! to call db internally
+    query = execute![τ](db, stmt)
     df = DataFrames.DataFrame(query); metadata!(df, "ob", table, style=:note)
     df
 end
 
 # clear_subpart!
 
-function ACSetInterface.clear_subpart!(db::DBSource, args...) end
+function clear_subpart!(db::DBSource, args...) end
 
-function ACSetInterface.rem_part!(db::DBSource, table::Symbol, id::Int)
-    rem_parts!(db, table, [id])
-end
+rem_part!(db::DBSource, table::Symbol, id::Int) = rem_parts!(db, table, [id])
 
-function ACSetInterface.rem_parts!(db::DBSource, table::Symbol, ids::Vector{Int}) 
+function rem_parts!(db::DBSource, table::Symbol, ids::Vector{Int}) 
     # if a table is constrained by another we might need to turn off foreign_key_checks
     execute!(db, ACSetDelete(table, ids))
     reload!(db)
@@ -119,16 +122,13 @@ function ACSetInterface.rem_parts!(db::DBSource, table::Symbol, ids::Vector{Int}
 end
 
 # rem_parts!(db, :V, 6:11) foreign key issue
-function ACSetInterface.rem_parts!(db::DBSource, table::Symbol, ids::UnitRange{Int64})
+function rem_parts!(db::DBSource, table::Symbol, ids::UnitRange{Int64})
     rem_parts!(db, table, collect(ids))
 end
 
-function ACSetInterface.cascading_rem_part!(db::DBSource, args...) end
+function cascading_rem_part!(db::DBSource, args...) end
 
-#
-function Schemas.objects(db::DBSource)
-    execute!(db, ShowTables())
-end
+Schemas.objects(db::DBSource) = execute!(db, ShowTables())
 
 # foreign keys
 function Schemas.homs(db::DBSource) end

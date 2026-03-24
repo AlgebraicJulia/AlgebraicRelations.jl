@@ -1,6 +1,6 @@
 name = "AlgebraicRelations"
 uuid = "1c3ea84b-a956-4dfe-a2f4-485757f48f1d"
-authors = ["bosonbaas <bosonbaas@gmail.com>"]
+authors = ["bosonbaas <bosonbaas@gmail.com>", "Matt Cuffaro"]
 version = "0.3.1"
 
 [deps]

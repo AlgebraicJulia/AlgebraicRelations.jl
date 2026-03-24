@@ -105,6 +105,7 @@ add_part!(fabric, :Country, country=:Antarctica, code=:ANT)
 
 add_part!(fabric, :Winemaker, wm_name=:BJs, country_code=FK{Country}(1))
 
+# return format
 @test subpart(fabric, :country_code) == [FK{Country}(1)]
 
 @test subpart(fabric, :Winemaker => :wm_name) == [:BJs]

@@ -1,9 +1,11 @@
 using ACSets
 using Catlab
 using AlgebraicRelations
-using SQLite, DBInterface
 
-τ = AlgebraicRelations.Fabric.DatabaseDS.DBSourceTrait()
+using SQLite, DBInterface
+using FunSQL
+
+τ = AlgebraicRelations.SQL.DatabaseDS.DBSourceTrait()
 fabric = DataFabric()
 
 @present SchClimate(FreeSchema) begin
@@ -88,7 +90,6 @@ add_part!(fabric, :CountryClimate, cc_country=FK{Country}(3), cc_climate=FK{Clim
 add_part!(fabric, :CountryClimate, cc_country=FK{Country}(3), cc_climate=FK{Climate}(1), cc_region=:WillametteValley)
 add_part!(fabric, :CountryClimate, cc_country=FK{Country}(3), cc_climate=FK{Climate}(2), cc_region=:Sonoma)
 
-
 @present SchWine(FreeSchema) begin
     (Name, Price, Grape)::AttrType
     Wine::Ob
@@ -134,6 +135,7 @@ winemaker_src = add_source!(fabric, winemaker_db, :Winemaker)
 add_fk!(fabric, winemaker_src, country_climate_src, :Winemaker!region => :CountryClimate!CountryClimate_id)
 # TODO when the column is incorrect, need more helpful error
 
+# TODO broken
 # data
 add_part!(fabric, :Winemaker, [
     (_id=1, region=FK{CountryClimate}(1), winemaker=:Planeta), #char
@@ -151,7 +153,8 @@ add_part!(fabric, :Winemaker, [
     # American wines
     (_id=13,region=FK{CountryClimate}(6), winemaker=:ScreaminEagle),
     (_id=14,region=FK{CountryClimate}(7), winemaker=:RexHill),
-    (_id=15,region=FK{CountryClimate}(8), winemaker=:Kistler)])
+    (_id=15,region=FK{CountryClimate}(8), winemaker=:Kistler)
+   ])
 
 @present SchWineWinemaker(FreeSchema) begin
     (Name, Wine, Winemaker)::AttrType

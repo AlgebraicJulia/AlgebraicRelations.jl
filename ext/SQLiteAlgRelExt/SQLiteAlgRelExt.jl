@@ -1,9 +1,13 @@
 module SQLiteAlgRelExt
 
 using AlgebraicRelations
-import AlgebraicRelations.SQLACSets.Fabric
+using AlgebraicRelations: SQL
+import AlgebraicRelations.Fabric
+import AlgebraicRelations: sql
 
 using Catlab.CategoricalAlgebra
+
+using TraitInterfaces
 
 using Tables
 using SQLite
@@ -22,11 +26,11 @@ function create(source::DBSource{SQLite.DB}, t::ACSet)
         "CREATE TABLE IF NOT EXISTS $ob(" *
         join(filter(!isempty, ["_id INTEGER PRIMARY KEY",
             join(map(homs(s; from=ob)) do (col, _, _)
-                tgttype = to_sql(source, Int)
+                tgttype = sql(source, Int)
                 "$col $tgttype"
             end, ", "),
             join(map(obattrs) do (col, src, tgt)
-                "$col $(to_sql(source, subpart_type(t, tgt)))"
+                "$col $(sql(source, subpart_type(t, tgt)))"
             end, ", ")
         ]), ", ")
     end
@@ -35,33 +39,37 @@ end
 export create
 
 # DB specific, type conversion
-# to_sql(::DBSource{SQLite.DB}, ::Type{<:Real}) = "REAL"
-# to_sql(::DBSource{SQLite.DB}, ::Type{<:AbstractString}) = "TEXT"
-# to_sql(::DBSource{SQLite.DB}, ::Type{<:Symbol}) = "TEXT"
-# to_sql(::DBSource{SQLite.DB}, ::Type{<:Integer}) = "INTEGER"
-# to_sql(::DBSource{SQLite.DB}, T::DataType) = error("$T is not supported in this SQLite implementation")
-# # _value conversion
-# to_sql(::DBSource{SQLite.DB}, ::Nothing) = "NULL"
-# to_sql(::DBSource{SQLite.DB}, x::T) where T<:Number = x
-# to_sql(::DBSource{SQLite.DB}, s::Symbol) = string(s)
-# to_sql(::DBSource{SQLite.DB}, s::String) = "\'$s\'"
-# to_sql(::DBSource{SQLite.DB}, x) = x
+# TODO confusing mess of type and value conversion
+sql(::DBSource{SQLite.DB}, ::Type{<:Real}) = "REAL"
+sql(::DBSource{SQLite.DB}, ::Type{<:AbstractString}) = "TEXT"
+sql(::DBSource{SQLite.DB}, ::Type{<:AbstractChar}) = "TEXT"
+sql(::DBSource{SQLite.DB}, ::Type{<:Symbol}) = "TEXT"
+sql(::DBSource{SQLite.DB}, ::Type{<:Integer}) = "INTEGER"
+sql(::DBSource{SQLite.DB}, fk::FK{T}) where T = fk.val
+sql(::DBSource{SQLite.DB}, s::Type{FK{T}}) where T = "INTEGER"
+sql(::DBSource{SQLite.DB}, T::DataType) = error("$T is not supported in this SQLite implementation")
+# _value conversion
+sql(::DBSource{SQLite.DB}, ::Nothing) = "NULL"
+sql(::DBSource{SQLite.DB}, x::T) where T<:Number = x
+sql(::DBSource{SQLite.DB}, s::Symbol) = "\'$(string(s))\'"
+sql(::DBSource{SQLite.DB}, s::String) = "\'$s\'"
+# sql(::DBSource{SQLite.DB}, x) = x
 
-function AlgebraicRelations.SQLACSets.Fabric.to_sql(::DBSource{SQLite.DB}, t)
-    _to_sql = @λ begin
+function sql(::DBSource{SQLite.DB}, t)
+    f = @λ begin
         ::Type{<:Real} => "REAL"
         ::Type{<:Integer} => "INTEGER"
         ::Type{<:FK} => "INTEGER" # TODO foreign key
         ::Type{<:Union{AbstractString, Char, Symbol}} => "TEXT"
         ::Nothing => "NULL"
         s::Symbol || ::AbstractString => "\'$s\'"
-        fk::FK{T} where T => _to_sql(fk.val)
+        fk::FK{T} where T => f(fk.val)
         s => s 
     end
-    _to_sql(t)
+    f(t)
 end
 
-function AlgebraicRelations.SQLACSets.Fabric.from_sql(::DBSource{SQLite.DB}, s::String)
+function AlgebraicRelations.Fabric.from_sql(::DBSource{SQLite.DB}, s::String)
     @match s begin
         "INT" || "int" || "INTEGER" => Integer
         "TEXT" || "varchar(255)" => String
@@ -71,17 +79,18 @@ end
 
 # TODO I don't like that the conversion function is also formatting. 
 # I would be at peace if formatting and value representation were separated
-function tosql(source::DBSource{SQLite.DB}, v::NamedTuple{T}; key::Bool=true) where T
+function sql(source::DBSource{SQLite.DB}, v::NamedTuple{T}; key::Bool=true) where T
     join(collect(Iterators.map(pairs(v)) do (k, v)
-        key ? "$(to_sql(source, k)) = $(to_sql(source, v))" : "$(to_sql(source, v))"
+        key ? "$(sql(source, k)) = $(sql(source, v))" : "$(sql(source, v))"
     end), ", ")
 end
 
-function tosql(source::DBSource{SQLite.DB}, values::Values{T}; key::Bool=true) where T
+# TODO syntax
+function sql(source::DBSource{SQLite.DB}, values::Values{T}; key::Bool=true) where T
     if length(values.vals) == 1
-        "$(tosql(source, only(values.vals); key=key))"
+        "$(sql(source, only(values.vals); key=key))"
     else
-        join(["($x)" for x ∈ tosql.(Ref(source), values.vals; key=key)], ", ")
+        join(["($x)" for x ∈ sql.(Ref(source), values.vals; key=key)], ", ")
     end
 end
 
@@ -94,19 +103,17 @@ function AlgebraicRelations.ForeignKeyChecks(source::DBSource{SQLite.DB}, stmt::
 end
 
 # overloading syntactical constructors 
-function AlgebraicRelations.ACSetInsert(source::DBSource{SQLite.DB}, acset::ACSet)
-    map(objects(acset_schema(acset))) do ob
-        ACSetInsert(source, acset, ob)
-    end
+function AlgebraicRelations.Insert(source::DBSource{SQLite.DB}, acset::ACSet)
+    [Insert(source, acset, ob) for ob in acset_schema(acset)]
 end
 
-function AlgebraicRelations.ACSetInsert(source::DBSource{SQLite.DB}, acset::ACSet, table::Symbol)
+function AlgebraicRelations.Insert(source::DBSource{SQLite.DB}, acset::ACSet, table::Symbol)
     cols = colnames(acset, table)
     vals = getrows(source, acset, table)
-    ACSetInsert(table, vals, nothing)
+    Insert(table, vals, nothing)
 end
 
-function AlgebraicRelations.SQLACSets.Fabric.get_schema(source::DBSource{SQLite.DB})
+function AlgebraicRelations.SQL.get_schema(source::DBSource{SQLite.DB})
     cmd = """
     SELECT 
         m.name AS table_name,
@@ -126,7 +133,8 @@ function AlgebraicRelations.SQLACSets.Fabric.get_schema(source::DBSource{SQLite.
         m.name,
         p.cid;
     """
-    execute!(source, cmd)
+    τ = trait(source)
+    AlgebraicRelations.execute![τ](source, cmd)
 end
 export get_schema
 

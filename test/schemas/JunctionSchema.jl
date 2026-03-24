@@ -33,8 +33,10 @@ reflection = reflect!(fabric)
 
 @testset "Generate DB Schema" begin
     for stmt in stmts
-        @test execute!(fabric, 1, stmt) isa DataFrame
+        @test execute![trait(fabric)](fabric, Statement(1, stmt)) isa DataFrame
     end
 end
+
+subpart(fabric, :Student)
 
 end

@@ -1,5 +1,7 @@
 module Schemas
 
+using ..SQL: sql
+
 using Catlab
 using Catlab.CategoricalAlgebra
 using FunSQL: SQLTable
@@ -22,28 +24,12 @@ end
 @abstract_acset_type AbstractSQLSchema
 @acset_type SQLSchema(TheorySQLSchema) <: AbstractSQLSchema
 
-TypeToSQL = Dict("String" => "TEXT",
-               "Int" => "INTEGER",
-               "Int64" => "INTEGER",
-               "IntArray" => "INTEGER[]",
-               "FloatMatrix" => "INTEGER[][]",
-               "Float64" => "REAL",
-               "FloatArray" => "REAL[]",
-               "FloatMatrix" => "REAL[][]",
-               "Bool" => "BOOLEAN",
-               "Date" => "DATE")
+# function SQLSchema(b::BasicSchema{T}) where T
+#     s = SQLSchema{T}()
+#     add_parts!(s, :Table, b[:obs]) 
+# end
 
-type2sql(::Type{<:Number}) = "REAL"
-type2sql(::Type{<:Vector{<:Number}}) = "REAL[]"
-type2sql(::Type{<:Matrix{<:Number}}) = "REAL[][]"
-type2sql(::Type{<:Int}) = "INTEGER"
-type2sql(::Type{<:Vector{<:Int}}) = "INTEGER[]"
-type2sql(::Type{<:Matrix{<:Int}}) = "INTEGER[][]"
-type2sql(::Type{<:String}) = "TEXT"
-type2sql(s::Symbol) = type2sql("$s")
-type2sql(s::String) = s ∈ keys(TypeToSQL) ? TypeToSQL[s] : "TEXT"
-export type2sql
-
+# This produces a SQLSchema from a presentation
 function SQLSchema(p::Presentation; types::Union{Dict, Nothing}=nothing)
     fields = get_fields(p, types)
     sch = SQLSchema{String}()
@@ -66,7 +52,7 @@ function SQLSchema(p::Presentation; types::Union{Dict, Nothing}=nothing)
           # TODO switched
           add_part!(sch, :FK, to=col, from=tab2ind[c[2]])
         else
-          type = type2sql(c[2])
+          type = sql(c[2])
           add_part!(sch, :Column, table = t_ind, cname = "$(c[3])", type=type)
         end
       end
@@ -98,6 +84,7 @@ function Presentation(sch::SQLSchema)
     tname = sch[sch[c, :table], :tname]
     Attr(Symbol(tname, "!", cname), ob_map[tname], attr_map[type])
   end
+  pres
 end
 export Presentation
 
@@ -143,6 +130,7 @@ function get_fields(sch::Presentation, types::Union{Dict, Nothing})
 end
 export get_fields
 
+# TODO convert to render
 function render_schema(sch::SQLSchema)
   table_gen = map(1:nparts(sch, :Table)) do t
       cols = incident(sch, t, :table)
@@ -163,12 +151,9 @@ function render_schema(sch::SQLSchema)
   "$(join(vcat(table_gen, fk_gen), ";\n"));"
 end
 
+load_schema(filename::String) = load_schema(JSON.parsefile(filename))
 
-function load_schema(filename::String)
-    load_schema(JSON.parsefile(filename))
-end
-
-function load_schema(dict::Dict)
+function load_schema(dict::Dict)::Dict{Symbol, Union{SQLType, SQLNode}}
     Dict{Symbol, Union{SQLTable, SQLNode}}(map(collect(keys(dict))) do k
         Symbol(k) => SQLTable(Symbol(k), columns = Symbol.(dict[k]))
     end)

@@ -1,4 +1,4 @@
-module SQLACSetSyntax
+module Syntax
 
 using ACSets
 
@@ -11,6 +11,8 @@ function tostring end
 export tostring
 
 tostring(conn, nothing) = ""
+
+abstract type AbstractSQLSyntax end
 
 # this typing ensures that named tuples have the same keys
 struct Values{T}
@@ -26,33 +28,32 @@ Base.broadcast(f, v::Values{T}) where T = Values{T}(v.table, broadcast(f, v.vals
 columns(v::Values{T}) where T = T
 export columns
 
-@as_record struct WhereClause
+@as_record struct WhereClause <: AbstractSQLSyntax
     operator::Symbol
     clauses::Union{Pair{Symbol, <:Any}, Vector{<:WhereClause}}
 end
 export WhereClause
 
-@kwdef struct SQLEquation
+@kwdef struct Equation <: AbstractSQLSyntax
     lhs::Pair{Symbol, Symbol}
     rhs::Pair{Symbol, Symbol}
     op::Symbol = :(==)
 end
-export SQLEquation
-
-SQLEquation(lhs, rhs) = SQLEquation(lhs=lhs, rhs=rhs)
+export Equation
+Equation(lhs, rhs) = Equation(lhs=lhs, rhs=rhs)
 
 # select expr from dual;
 # SQLite supports SELECT * FROM A, B, C ON (A.x = B.y AND B.y = C.z)
 # select * from t1 inner join
 
-@data SQLSelectQuantity begin
+@data SelectQuantity <: AbstractSQLSyntax begin
     SelectAll() # default
     SelectDistinct()
     SelectDistinctRow()
     # Pair{Symbol, Symbol} is table.column relation
     SelectColumns(::Vector{Union{Symbol, Pair{Symbol, Symbol}}})
 end
-export SQLSelectQuantity, SelectAll, SelectDistinct, SelectDistinctRow, SelectColumns
+export SelectQuantity, SelectAll, SelectDistinct, SelectDistinctRow, SelectColumns
 
 SelectColumns(t::Union{Symbol, Pair{Symbol, Symbol}}) = SelectColumns([t])
 SelectColumns(varargs...) = SelectColumns([varargs...])
@@ -65,57 +66,58 @@ function SelectColumns(t::Vector{Pair{Symbol, Any}})
     SelectColumns(xs)
 end
 
-struct ACSetJoin
+struct Join <: AbstractSQLSyntax
     type::Symbol
     table::Symbol
-    on::Union{Vector{SQLEquation}, Nothing}
-    function ACSetJoin(type::Symbol, table::Symbol, on::SQLEquation)
+    on::Union{Vector{Equation}, Nothing}
+    function Join(type::Symbol, table::Symbol, on::Equation)
         new(type, table, [on])
     end
 end
-export ACSetJoin
+export Join
 
 abstract type AbstractSQLTerm end
 export AbstractSQLTerm
 
 @data SQLTerms <: AbstractSQLTerm begin
-    ACSetInsert(table::Symbol, values::Values, wheres::Union{WhereClause, Nothing})
-    ACSetUpdate(table::Symbol, values::Values, wheres::Union{WhereClause, Nothing})
-    ACSetSelect(qty::SQLSelectQuantity, 
+    Insert(table::Symbol, values::Values, wheres::Union{WhereClause, Nothing})
+    Update(table::Symbol, values::Values, wheres::Union{WhereClause, Nothing})
+    Select(qty::SelectQuantity, 
         from::Union{Symbol, Vector{Symbol}}, # TODO could be subquery 
-        join::Union{ACSetJoin, Nothing},
-        wheres::Union{ACSetSelect, WhereClause, Nothing})
-    ACSetAlter(table::Symbol, refdom::Symbol, refcodom::Symbol)
-    ACSetCreate(schema::BasicSchema{Symbol})
-    ACSetDelete(table::Symbol, ids::Vector{Int})
+        join::Union{Join, Nothing},
+        wheres::Union{Select, WhereClause, Nothing})
+    Alter(table::Symbol, refdom::Symbol, refcodom::Symbol)
+    Create(schema::BasicSchema{Symbol})
+    Delete(table::Symbol, ids::Vector{Int})
 end
-export SQLTerms, Values, ACSetInsert, ACSetUpdate, ACSetSelect, ACSetAlter, ACSetCreate, ACSetDelete
+export SQLTerms, Values, Insert, Update, Select, Alter, Create, Delete
 
 ## Constructors
 
-function ACSetSelect(from::Union{Symbol, Vector{Symbol}}; 
-        what::SQLSelectQuantity=SelectAll(),
-        on::Union{Vector{SQLEquation}, Nothing}=nothing, 
+function Select(from::Union{Symbol, Vector{Symbol}}; 
+        what::SelectQuantity=SelectAll(),
+        on::Union{Vector{Equation}, Nothing}=nothing, 
         wheres::Union{WhereClause, Nothing}=nothing)
-    ACSetSelect(what, from, on, wheres)
+    Select(what, from, on, wheres)
 end
 
-function ACSetAlter(table::Symbol, arrow::Pair{Symbol, Symbol})
-    ACSetAlter(table, arrow.first, arrow.second)
+function Alter(table::Symbol, arrow::Pair{Symbol, Symbol})
+    Alter(table, arrow.first, arrow.second)
 end
 
-function ACSetCreate(acset::SimpleACSet)
-    ACSetCreate(acset_schema(acset))
+function Create(acset::SimpleACSet)
+    Create(acset_schema(acset))
 end
 
-function ACSetInsert(table::Symbol, vs::Vector{<:NamedTuple{T}}, wheres::Union{WhereClause, Nothing}=nothing) where T
-    ACSetInsert(table, Values(table, vs), wheres)
+function Insert(table::Symbol, vs::Vector{<:NamedTuple{T}}, wheres::Union{WhereClause, Nothing}=nothing) where T
+    Insert(table, Values(table, vs), wheres)
 end
 
-function ACSetUpdate(table::Symbol, vs::Vector{<:NamedTuple{T}}, wheres::Union{WhereClause, Nothing}=nothing) where T
-    ACSetUpdate(table, Values(table, vs), wheres)
+function Update(table::Symbol, vs::Vector{<:NamedTuple{T}}, wheres::Union{WhereClause, Nothing}=nothing) where T
+    Update(table, Values(table, vs), wheres)
 end
 
+# TODO not an AbstractSQLTerm
 abstract type DatabaseEnvironmentConfig <: AbstractSQLTerm end
 
 struct ShowTables <: DatabaseEnvironmentConfig end
