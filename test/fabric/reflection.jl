@@ -4,7 +4,9 @@ using ACSets
 using Catlab
 using AlgebraicRelations
 
-τ = AlgebraicRelations.Fabric.DatabaseDS.DBSourceTrait()
+using SQLite
+
+τ = AlgebraicRelations.SQL.DatabaseDS.DBSourceTrait()
 
 @testset "Wine" begin
 
@@ -77,7 +79,7 @@ end
         violet::Attr(Hue, Violet)
     end
     @acset_type Rainbow(SchRainbow)
-    rainbow = Rainbow{Int, Symbol, DataType, Vector, Char, Real, Bool}()
+    rainbow = Rainbow{Int, Symbol, Rational, Vector, Char, Real, Bool}()
     rainbow_db = DBSource(SQLite.DB(), acset_schema(rainbow))
 
     using FunSQL

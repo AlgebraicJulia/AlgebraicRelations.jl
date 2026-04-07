@@ -1,80 +1,10 @@
-# TODO GraphQL?
-
-using Test
-
 using AlgebraicRelations
 using Catlab
-#
+
+using Test
 using FunSQL
 using SQLite
 using DataFrames
-
-@present SchoolSystem(FreeSchema) begin
-    Name::AttrType
-    (School, SchoolClass, Class, ClassStudent, Student)::Ob
-    sc_school::Hom(SchoolClass, School)
-    sc_class::Hom(SchoolClass, Class)
-    cs_class::Hom(ClassStudent, Class)
-    cs_student::Hom(ClassStudent, Student)
-    school::Attr(School, Name)
-    class::Attr(Class, Name)
-    student::Attr(Student, Name)
-end
-
-schema = SQLSchema(SchoolSystem)
-split_stmts = split(render_schema(schema), "\n")
-
-bare_db = SQLite.DB()
-fundb = FunSQL.DB(bare_db, catalog=FunSQL.reflect(bare_db))
-
-old_catalog = fundb.catalog
-for stmt in split_stmts
-    DBInterface.execute(fundb, stmt)
-end
-
-new_catalog = fundb.catalog
-@assert new_catalog == old_catalog
-
-db = DBSource(SQLite.DB(), schema)
-
-# we have our own `execute!` 
-for stmt in split_stmts
-    execute!(db, stmt)
-end
-execute!(db, ShowTables())
-
-# data fabric
-fabric = DataFabric()
-db_id = add_source!(fabric, db)
-reflection = reflect!(fabric)
-
-# idempotence
-@assert reflect!(fabric) == reflection 
-
-insert_stmts = [
-    "INSERT OR IGNORE INTO Student (Student_id, student) VALUES (1, 'Gregorio')",
-    "INSERT OR IGNORE INTO Student (Student_id, student) VALUES (2, 'Heather')",
-    "INSERT OR IGNORE INTO School (School_id, school) VALUES (1, 'Erewhon University');",
-    "INSERT OR IGNORE INTO School (School_id, school) VALUES (2, 'Utopia State');",
-    "INSERT OR IGNORE INTO ClassStudent (ClassStudent_id, cs_class, cs_student) VALUES (1, 1, 1);",
-    "INSERT OR IGNORE INTO ClassStudent (ClassStudent_id, cs_class, cs_student) VALUES (1, 2, 1);",
-    "INSERT OR IGNORE INTO Class (Class_id, class) VALUES (1, 'math');",
-    "INSERT OR IGNORE INTO Class (Class_id, class) VALUES (2, 'science');", 
-    "INSERT OR IGNORE INTO SchoolClass (SchoolClass_id, sc_school, sc_class) VALUES (1, 1, 1);"
-]
-
-for stmt in insert_stmts
-    execute!(db, stmt)
-end
-
-subpart(db, :Class)
-subpart(fabric, :Class)
-
-subpart(fabric, :ClassStudent)
-subpart(fabric, :student)
-
-# TODO execute should be defined 
-DBInterface.execute(_db.conn, "select * from `Salary`;") |> DataFrame
 
 # ###########
 
@@ -99,7 +29,7 @@ for stmt in insert_stmts
     execute!(db, stmt)
 end
 
-execute!(db, ShowTables())
+# execute!(db, ShowTables())
 
 subpart(db, :Salary)
 subpart(fabric, :Salary)

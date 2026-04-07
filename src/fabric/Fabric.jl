@@ -1,12 +1,15 @@
+"""
+The DataFabric is an edge-labeled graph of data sources and schema-schema interrelations
+which implements the ACSet interface. It may "virtualize" data by querying it
+into memory.
+"""
 module Fabric
 
-using ...Schemas
-using ..SQLACSetSyntax
+using ..SQL: SQLSchema, ThDataSource, AbstractDataSource, columntypes, execute!
+using ..SQL.Syntax
+using ...AlgebraicRelations: Log, Maybe
+import ...AlgebraicRelations: trait
 
-# The DataFabric is an edge-labeled graph of data sources and schema-schema interrelations
-# which implements the ACSet interface. It may "virtualize" data by querying it
-# into memory.
-#
 # ## Colimiting: 
 # If all the data sources have known database schema, then we can assembly the
 # data into a single ACSet schema.
@@ -28,10 +31,6 @@ using PrettyTables
 using StructEquality
 using Reexport
 
-
-function columntypes end
-export columntypes
-
 struct PK end
 export PK
 
@@ -44,16 +43,6 @@ export get_sqlite_schema
     val::Int
 end
 export FK
-
-# DATA SOURCES
-abstract type AbstractDataSource end
-export AbstractDataSource
-
-get_schema(::AbstractDataSource) = []
-export get_schema
-
-function to_sql end
-export to_sql
 
 function from_sql end
 export from_sql
@@ -103,55 +92,10 @@ function Catlab.Graphics.Graphviz.view_graphviz(g::DataSourceGraph)
 end
 export view_graphviz
 
-# TODO change Any to AbstractResult
-QueryResultDSGraph = DataSourceGraph{Symbol, Union{DataFrame, Nothing}, Symbol}
-
-struct QueryResultWrapper
-    qg::QueryResultDSGraph
-    # query
-end
-export QueryResultWrapper
-
-function QueryResultWrapper(g::DataSourceGraph)
-    qg = QueryResultDSGraph()
-    add_parts!(qg, :V, nparts(g, :V), label=subpart(g, :label))
-    edges = parts(g, :E)
-    for e in edges
-        foot1 = subpart(g, e, :src)
-        foot2 = subpart(g, e, :tgt)
-        label1 = subpart(g, foot1, :label)
-        label2 = subpart(g, foot2, :label)
-        apex = add_part!(qg, :V, label=Symbol("$label1⨝$label2"))
-        add_parts!(qg, :E, 2, src=[apex, apex], tgt=[foot1, foot2], edgelabel=[label1, label2])
-    end
-    QueryResultWrapper(qg)
-end
-export QueryResultWrapper
-
-# DataFabric
-struct Log
-    time::DateTime
-    event
-    Log(event::DataType) = new(Dates.now(), event)
-end
-export Log
-
 using TraitInterfaces
 import Catlab: ACSet
 
-# TODO derive as a trait
-
-@interface ThDataSource begin
-    @import ACSet::TYPE
-    @import Vector::TYPE
-    @import AbstractString::TYPE
-    Source::TYPE # Type of data 
-    reconnect!(s::Source)::Source
-    # incident(s::Source, r::Row, c::Column)::Vector{Row}
-    execute!(d::Source, stmt::AbstractString)::ACSet # TODO stmt, formatter
-    schema(d::Source)::ACSet
-end
-export ThDataSource, reconnect!, execute!
+include("query/Query.jl")
 
 @kwdef mutable struct DataFabric
     # this will store the connections, their schema, and values
@@ -170,13 +114,16 @@ export catalog
 queries(fabric::DataFabric) = fabric.queries
 export queries
 
-function trait end
-export trait
-
 struct FabricTrait end 
 trait(::DataFabric) = FabricTrait()
 
-TraitInterfaces.@instance ThDataSource{Source=DataFabric} [model::FabricTrait] begin
+struct Statement
+    src::Int
+    stmt::String
+end
+export Statement
+
+TraitInterfaces.@instance ThDataSource{Source=DataFabric,Statement=Statement} [model::FabricTrait] begin
     """ Reconnect to all data sources on nodes """
     function reconnect!(fabric::DataFabric)
         foreach(parts(fabric.graph, :V)) do i
@@ -187,31 +134,37 @@ TraitInterfaces.@instance ThDataSource{Source=DataFabric} [model::FabricTrait] b
         fabric
     end
     """ TODO """
-    function execute!(fabric::DataFabric, stmt::AbstractString)
-        # execute!(fabric.graph[source_id, :value], stmt)
-        nothing
+    function execute!(fabric::DataFabric, stmt::Statement)
+        node = fabric.graph[stmt.src, :value]
+        execute![trait(node)](node, stmt.stmt)
     end
     """ TODO """
     function schema(fabric::DataFabric)
         nothing
     end
 end
+export reconnect!, execute!, schema
 
 function reflect_source!(fabric::DataFabric, vs::Vector{Int})
     foreach(vs) do source_id
         source = subpart(fabric.graph, source_id, :value)
-        schema = SQLSchema(Presentation(acset_schema(source)))
+        # TODO XXX InMemory and DBSource will have different acset_schemas
+        schema = acset_schema(source)
+        schema = schema isa SQLSchema ? schema : SQLSchema(Presentation(schema))
+        # schema = SQLSchema(Presentation(acset_schema(source)))
         types = columntypes(source)
         add_to_catalog!(fabric.catalog, schema; source=source_id, conn=typeof(source), types=types)
     end
 end
+
+reflect_source!(fabric, vs::UnitRange{Int64}) = reflect_source!(fabric, collect(vs))
 
 function reflect_edges!(fabric::DataFabric, es::Vector{Int})
     # TODO improve this
     foreach(es) do edge_id
         src, tgt, edgelabel = subpart.(Ref(fabric.graph), edge_id, [:src, :tgt, :edgelabel])
         # gets table associated to source
-        fromtable, fromcol = split("$(edgelabel.first)", "!")
+        fromtable, fromcol = split("$(edgelabel.first)", "!") # TODO i dislike this (de-)munging
         totable, tocol = split("$(edgelabel.second)", "!")
         from = only(incident(fabric.catalog, Symbol(fromcol), :cname))
         to = only(incident(fabric.catalog, Symbol(tocol), :cname))
@@ -224,12 +177,11 @@ function reflect_edges!(fabric::DataFabric, es::Vector{Int})
     end
 end
 
+reflect_edges!(fabric, vs::UnitRange{Int64}) = reflect_edges!(fabric, collect(vs))
 
 # TODO don't want copy sources , TODO need idempotence
-"""
-
-"""
-function reflect!(fabric::DataFabric; source_id::Union{Int, Nothing}=nothing, edge_id::Union{Int, Nothing}=nothing)
+""" """
+function reflect!(fabric::DataFabric; source_id::Maybe{Int}=nothing, edge_id::Maybe{Int}=nothing)
     vs = isnothing(source_id) ? isnothing(edge_id) ? parts(fabric.graph, :V) : Int[] : [source_id]
     reflect_source!(fabric, vs)
     es = isnothing(edge_id) ? isnothing(source_id) ? parts(fabric.graph, :E) : Int[] : [edge_id]
@@ -265,19 +217,12 @@ export add_fk!
 function render end
 export render
 
-
 # ACSet Interface for the Fabric. It determines which data source to dispatch the ACSet function on
 include("acset_interface.jl")
 include("queryplanning.jl")
 
-include("datasources/database/DatabaseDS.jl")
-include("datasources/inmemory/InMemoryDS.jl")
-
 # Custom show methods for Fabric objects
 include("show.jl")
-
-@reexport using .DatabaseDS
-@reexport using .InMemoryDS
 
 
 end

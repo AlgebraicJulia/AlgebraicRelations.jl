@@ -1,9 +1,10 @@
 module MySQLAlgRelExt
 
 using Catlab.CategoricalAlgebra
+
 using AlgebraicRelations
-using AlgebraicRelations.Schemas
-import AlgebraicRelations: tosql
+using AlgebraicRelations.SQL
+import AlgebraicRelations: sql
 
 using FunSQL
 using FunSQL: render
@@ -46,55 +47,53 @@ function AlgebraicRelations.reload!(source::DBSource{MySQL.Connection})
     source.conn = FunSQL.DB(conn, catalog=FunSQL.reflect(conn))
 end
 
-function tosql end
-
 # DB specific, type conversion
-tosql(::DBSource{MySQL.Connection}, ::Type{<:Real}) = "REAL"
-tosql(::DBSource{MySQL.Connection}, ::Type{<:AbstractString}) = "TEXT"
-tosql(::DBSource{MySQL.Connection}, ::Type{<:Symbol}) = "TEXT"
-tosql(::DBSource{MySQL.Connection}, ::Type{<:Integer}) = "INTEGER"
-tosql(::DBSource{MySQL.Connection}, T::DataType) = error("$T is not supported in this MySQL implementation")
+sql(::DBSource{MySQL.Connection}, ::Type{<:Real}) = "REAL"
+sql(::DBSource{MySQL.Connection}, ::Type{<:AbstractString}) = "TEXT"
+sql(::DBSource{MySQL.Connection}, ::Type{<:Symbol}) = "TEXT"
+sql(::DBSource{MySQL.Connection}, ::Type{<:Integer}) = "INTEGER"
+sql(::DBSource{MySQL.Connection}, T::DataType) = error("$T is not supported in this MySQL implementation")
 # value conversion
-tosql(::DBSource{MySQL.Connection}, ::Nothing) = "NULL"
-tosql(::DBSource{MySQL.Connection}, x::T) where T<:Number = x
-tosql(::DBSource{MySQL.Connection}, s::Symbol) = string(s)
-tosql(::DBSource{MySQL.Connection}, s::String) = "\'$s\'"
-tosql(::DBSource{MySQL.Connection}, x) = x
+sql(::DBSource{MySQL.Connection}, ::Nothing) = "NULL"
+sql(::DBSource{MySQL.Connection}, x::T) where T<:Number = x
+sql(::DBSource{MySQL.Connection}, s::Symbol) = string(s)
+sql(::DBSource{MySQL.Connection}, s::String) = "\'$s\'"
+sql(::DBSource{MySQL.Connection}, x) = x
 
 # TODO I don't like that the conversion function is also formatting. 
 # I would be at peace if formatting and value representation were separated
-function tosql(source::DBSource{MySQL.Connection}, v::NamedTuple{T}; key::Bool=true) where T
+function sql(source::DBSource{MySQL.Connection}, v::NamedTuple{T}; key::Bool=true) where T
     join(collect(Iterators.map(pairs(v)) do (k, v)
-                     key ? "$(tosql(source, k)) = $(tosql(source, v))" : "$(tosql(source, v))"
+                     key ? "$(sql(source, k)) = $(sql(source, v))" : "$(sql(source, v))"
     end), ", ")
 end
 
-function tosql(source::DBSource{MySQL.Connection}, values::Values{T}; key::Bool=true) where T
-    if length(values.vals) == 1
-        "$(tosql(source, only(values.vals); key=key))"
-    else
-        join(["($x)" for x ∈ tosql.(Ref(source), values.vals; key=key)], ", ")
-    end
-end
+# function sql(source::DBSource{MySQL.Connection}, values::Values{T}; key::Bool=true) where T
+#     if length(values.vals) == 1
+#         "$(sql(source, only(values.vals); key=key))"
+#     else
+#         join(["($x)" for x ∈ sql.(Ref(source), values.vals; key=key)], ", ")
+#     end
+# end
 
 # String constructors
-export render
+# export render
 
-function FunSQL.render(source::DBSource{MySQL.Connection}, i::ACSetInsert)
+function FunSQL.render(source::DBSource{MySQL.Connection}, i::Insert)
     cols = join(columns(i.values), ", ")
-    values = join(["($x)" for x ∈ tosql.(Ref(source), i.values.vals; key=false)], ", ")
+    values = join(["($x)" for x ∈ sql.(Ref(source), i.values.vals; key=false)], ", ")
     "INSERT IGNORE INTO $(i.table) ($cols) VALUES $values ;"
 end
 
-function FunSQL.render(source::DBSource{MySQL.Connection}, u::ACSetUpdate) 
+function FunSQL.render(source::DBSource{MySQL.Connection}, u::Update) 
     cols = join(columns(u.values), ", ")
     wheres = !isnothing(u.wheres) ? render(source, u.wheres) : ""
     @info wheres
-    "UPDATE $(u.table) SET $(tosql(source, u.values)) " * wheres * ";"
+    "UPDATE $(u.table) SET $(sql(source, u.values)) " * wheres * ";"
 end
 
-# TODO might have to refactor so we can reuse code for show method
-function FunSQL.render(source::DBSource{MySQL.Connection}, s::ACSetSelect)
+# # TODO might have to refactor so we can reuse code for show method
+function FunSQL.render(source::DBSource{MySQL.Connection}, s::SQL.Syntax.Select)
     from = s.from isa Vector ? join(s.from, ", ") : s.from
     qty = render(source, s.qty)
     join = !isnothing(s.join) ? render(source, s.join) : " "
@@ -102,19 +101,19 @@ function FunSQL.render(source::DBSource{MySQL.Connection}, s::ACSetSelect)
     "SELECT $qty FROM $from " * join * wheres * ";"
 end
 
-function FunSQL.render(source::DBSource{MySQL.Connection}, j::ACSetJoin)
+function FunSQL.render(source::DBSource{MySQL.Connection}, j::Join)
     "$(j.type) JOIN $(j.table) ON $(render(source, j.on))"
 end
 
-function FunSQL.render(source::DBSource{MySQL.Connection}, ons::Vector{SQLEquation})
+function FunSQL.render(source::DBSource{MySQL.Connection}, ons::Vector{Equation})
     join(render.(Ref(source), ons), " AND ")
 end
 
-function FunSQL.render(source::DBSource{MySQL.Connection}, eq::SQLEquation)
+function FunSQL.render(source::DBSource{MySQL.Connection}, eq::Equation)
     "$(eq.lhs.first).$(eq.rhs.second) = $(eq.rhs.first).$(eq.rhs.second)"
 end
 
-function FunSQL.render(source::DBSource{MySQL.Connection}, qty::SQLSelectQuantity)
+function FunSQL.render(source::DBSource{MySQL.Connection}, qty::SelectQuantity)
     @match qty begin
         ::SelectAll || ::SelectDistinct || ::SelectDistinctRow => "*"
         SelectColumns(cols) => join(render.(Ref(source), cols), ", ")
@@ -128,7 +127,7 @@ function FunSQL.render(::DBSource{MySQL.Connection}, column::Union{Pair{Symbol, 
     end
 end
 
-# TODO
+# # TODO
 function FunSQL.render(::DBSource{MySQL.Connection}, wheres::WhereClause)
     @match wheres begin
         WhereClause(op, d::Pair) => "WHERE $(d.first) $op ($(join(d.second, ", ")))"
@@ -136,25 +135,25 @@ function FunSQL.render(::DBSource{MySQL.Connection}, wheres::WhereClause)
     end
 end
 
-function FunSQL.render(source::DBSource, c::ACSetCreate)
-    create_stmts = map(objects(c.schema)) do ob
-        obattrs = attrs(c.schema; from=ob)
-        "CREATE TABLE IF NOT EXISTS $(ob)(" * 
-            join(filter(!isempty, ["_id INTEGER PRIMARY KEY",
-                # column_name column_type
-                join(map(homs(c.schema; from=ob)) do (col, src, tgt)
-                       tgttype = tosql(source, Int)
-                       "$(col) $tgttype"
-                end, ", "),
-                join(map(obattrs) do (col, _, type)
-                    # FIXME
-                    "$(col) $(tosql(source, subpart_type(source.acsettype(), type)))" 
-               end, ", ")]), ", ") * ");"
-    end
-    join(create_stmts, " ")
-end
+# function FunSQL.render(source::DBSource, c::Create)
+#     create_stmts = map(objects(c.schema)) do ob
+#         obattrs = attrs(c.schema; from=ob)
+#         "CREATE TABLE IF NOT EXISTS $(ob)(" * 
+#             join(filter(!isempty, ["_id INTEGER PRIMARY KEY",
+#                 # column_name column_type
+#                 join(map(homs(c.schema; from=ob)) do (col, src, tgt)
+#                        tgttype = sql(source, Int)
+#                        "$(col) $tgttype"
+#                 end, ", "),
+#                 join(map(obattrs) do (col, _, type)
+#                     # FIXME
+#                     "$(col) $(sql(source, subpart_type(source.acsettype(), type)))" 
+#                end, ", ")]), ", ") * ");"
+#     end
+#     join(create_stmts, " ")
+# end
 
-function FunSQL.render(source::DBSource{MySQL.Connection}, d::ACSetDelete)
+function FunSQL.render(source::DBSource{MySQL.Connection}, d::Delete)
     "DELETE FROM $(d.table) WHERE _id IN ($(join(d.ids, ",")))"
 end
 
@@ -162,7 +161,7 @@ function FunSQL.render(::DBSource{MySQL.Connection}, v::Values)
     "VALUES " * join(entuple(v), ", ") * ";"
 end
 
-function FunSQL.render(::DBSource{MySQL.Connection}, a::ACSetAlter)
+function FunSQL.render(::DBSource{MySQL.Connection}, a::Alter)
     "ALTER TABLE $(a.refdom) ADD CONSTRAINT fk_$(ref) FOREIGN KEY ($(a.ref)) REFERENCES $(a.refcodom)(_id); "
 end
 
@@ -181,16 +180,16 @@ function AlgebraicRelations.ForeignKeyChecks(source::DBSource{MySQL.Connection},
 end
 
 # overloading syntactical constructors 
-function AlgebraicRelations.ACSetInsert(source::DBSource{MySQL.Connection}, acset::ACSet)
+function AlgebraicRelations.Insert(source::DBSource{MySQL.Connection}, acset::ACSet)
     map(objects(acset_schema(acset))) do ob
-        ACSetInsert(source, acset, ob)
+        Insert(source, acset, ob)
     end
 end
 
-function AlgebraicRelations.ACSetInsert(source::DBSource{MySQL.Connection}, acset::ACSet, table::Symbol)
+function AlgebraicRelations.Insert(source::DBSource{MySQL.Connection}, acset::ACSet, table::Symbol)
     cols = colnames(acset, table)
     vals = getrows(source, acset, table)
-    ACSetInsert(table, vals, nothing)
+    Insert(table, vals, nothing)
 end
 
 end

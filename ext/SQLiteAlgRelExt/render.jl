@@ -1,12 +1,11 @@
 using FunSQL
 using FunSQL: render, reflect
 
-# import ACSets.Query: WhereCondition
-
+import ACSets.Query: WhereCondition
 
 # TODO have table alias
 # function FunSQL.render(source::DBSource{SQLite.DB}, wc::WhereCondition)
-#     "$(wc.lhs[1]).$(wc.lhs[2]) = $(to_sql(source, wc.rhs))"
+#     "$(wc.lhs[1]).$(wc.lhs[2]) = $(sql(source, wc.rhs))"
 # end
 
 """ Dispatches FunSQL's render SQLNodes """
@@ -14,24 +13,25 @@ function FunSQL.render(source::DBSource{SQLite.DB}, n::FunSQL.SQLNode)
     FunSQL.render(source.conn, n)
 end
 
-# Render functions convert our intermediate syntax (ACSetInsert, etc.) into
+# Render functions convert our intermediate syntax (Insert, etc.) into
 # strings in the target DB dialect.
 
-function FunSQL.render(source::DBSource{SQLite.DB}, i::ACSetInsert)
+function FunSQL.render(source::DBSource{SQLite.DB}, i::Insert)
     cols = join(columns(i.values), ", ")
-    values = join(["($x)" for x ∈ tosql.(Ref(source), i.values.vals; key=false)], ", ")
+    # TODO what is the "key" doing here
+    values = join(["($x)" for x ∈ sql.(Ref(source), i.values.vals; key=false)], ", ")
     "INSERT OR IGNORE INTO $(i.table) ($cols) VALUES $values ;"
 end
 export render
 
-function FunSQL.render(source::DBSource{SQLite.DB}, u::ACSetUpdate) 
+function FunSQL.render(source::DBSource{SQLite.DB}, u::Update) 
     cols = join(columns(u.values), ", ")
     wheres = !isnothing(u.wheres) ? render(source, u.wheres) : ""
-    "UPDATE $(u.table) SET $(tosql(source, u.values)) " * wheres * ";"
+    "UPDATE $(u.table) SET $(sql(source, u.values)) " * wheres * ";"
 end
 
 # TODO might have to refactor so we can reuse code for show method
-function FunSQL.render(source::DBSource{SQLite.DB}, s::ACSetSelect)
+function FunSQL.render(source::DBSource{SQLite.DB}, s::SQL.Syntax.Select)
     from = s.from isa Vector ? join(s.from, ", ") : s.from
     qty = render(source, s.qty)
     join = !isnothing(s.join) ? render(source, s.join) : " "
@@ -39,19 +39,19 @@ function FunSQL.render(source::DBSource{SQLite.DB}, s::ACSetSelect)
     "SELECT $qty FROM $from " * join * wheres * ";"
 end
 
-function FunSQL.render(source::DBSource{SQLite.DB}, j::ACSetJoin)
+function FunSQL.render(source::DBSource{SQLite.DB}, j::Join)
     "$(j.type) JOIN $(j.table) ON $(render(source, j.on))"
 end
 
-function FunSQL.render(source::DBSource{SQLite.DB}, ons::Vector{SQLEquation})
+function FunSQL.render(source::DBSource{SQLite.DB}, ons::Vector{Equation})
     join(render.(Ref(source), ons), " AND ")
 end
 
-function FunSQL.render(source::DBSource{SQLite.DB}, eq::SQLEquation)
+function FunSQL.render(source::DBSource{SQLite.DB}, eq::Equation)
     "$(eq.lhs.first).$(eq.rhs.second) = $(eq.rhs.first).$(eq.rhs.second)"
 end
 
-function FunSQL.render(source::DBSource{SQLite.DB}, qty::SQLSelectQuantity)
+function FunSQL.render(source::DBSource{SQLite.DB}, qty::SelectQuantity)
     @match qty begin
         ::SelectAll || ::SelectDistinct || ::SelectDistinctRow => "*"
         SelectColumns(cols) => join(render.(Ref(source), cols), ", ")
@@ -73,19 +73,19 @@ function FunSQL.render(::DBSource{SQLite.DB}, wheres::WhereClause)
     end
 end
 
-function FunSQL.render(source::DBSource, c::ACSetCreate)
+function FunSQL.render(source::DBSource, c::Create)
     create_stmts = map(objects(c.schema)) do ob
         obattrs = attrs(c.schema; from=ob)
         "CREATE TABLE IF NOT EXISTS $(ob)(" * 
             join(filter(!isempty, ["_id INTEGER PRIMARY KEY",
                 # column_name column_type
                 join(map(homs(c.schema; from=ob)) do (col, src, tgt)
-                       tgttype = tosql(source, Int)
+                       tgttype = sql(source, Int)
                        "$(col) $tgttype"
                 end, ", "),
                 join(map(obattrs) do (col, _, type)
                     # FIXME
-                    "$(col) $(tosql(source, subpart_type(source.acsettype(), type)))" 
+                    "$(col) $(sql(source, subpart_type(source.acsettype(), type)))" 
                end, ", ")]), ", ") * ");"
     end
     join(create_stmts, " ")
@@ -98,18 +98,18 @@ function FunSQL.render(source::DBSource, t::ACSet)
         "CREATE TABLE IF NOT EXISTS $ob(" *
         join(filter(!isempty, ["_id INTEGER PRIMARY KEY",
             join(map(homs(s; from=ob)) do (col, _, _)
-                tgttype = to_sql(source, Int)
+                tgttype = sql(source, Int)
                 "$col $tgttype"
             end, ", "),
             join(map(obattrs) do (col, src, tgt)
-                "$col $(to_sql(source, subpart_type(t, tgt)))"
+                "$col $(sql(source, subpart_type(t, tgt)))"
             end, ", ")
            ]), ", ") * ");"
     end
     join(stmts, " ")
 end
 
-function FunSQL.render(source::DBSource{SQLite.DB}, d::ACSetDelete)
+function FunSQL.render(source::DBSource{SQLite.DB}, d::Delete)
     "DELETE FROM $(d.table) WHERE _id IN ($(join(d.ids, ",")))"
 end
 
@@ -117,7 +117,7 @@ function FunSQL.render(::DBSource{SQLite.DB}, v::Values)
     "VALUES " * join(entuple(v), ", ") * ";"
 end
 
-function FunSQL.render(::DBSource{SQLite.DB}, a::ACSetAlter)
+function FunSQL.render(::DBSource{SQLite.DB}, a::Alter)
     "ALTER TABLE $(a.refdom) ADD CONSTRAINT fk_$(ref) FOREIGN KEY ($(a.ref)) REFERENCES $(a.refcodom)(_id); "
 end
 
