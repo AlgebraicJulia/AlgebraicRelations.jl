@@ -10,7 +10,7 @@ import ...AlgebraicRelations: trait
 
 # this is an ACSet
 mutable struct InMemory <: AbstractDataSource
-    value
+    value # maybe type by some wrapper for tabulated data
     # TODO need better method
     function InMemory(value::AbstractDataSource)
         error("No!")

@@ -32,3 +32,42 @@ function wrap(stmt::String, left::String, right::String)
     join([left, stmt, right], " ")
 end
 export wrap
+
+p = @present Something(FreeSchema) begin
+    ob::Ob
+    t::AttrType
+    v::Attr(ob, t)
+end
+
+# i assume freeschema
+function shunt(p::Presentation)
+    n = (at -> Symbol("obj_$(nameof(at))"))
+    q = Presentation(FreeSchema)
+    obs = p.generators.Ob
+    add_generators!(q, obs)
+    # add original homs
+    homs = p.generators.Hom
+    add_generators!(q, homs)
+    # add the attrtypes to objects
+    ats = p.generators.AttrType
+    add_generators!(q, ats)
+    attrdict = Dict(at => add_generator!(q, Ob(FreeSchema.Ob, n(at))) for at in ats)
+    # for every attr, create a hom to the attr-ob and create an attr from the attr-ob
+    for attr in p.generators.Attr
+        newhom = Hom(gensym(nameof(attr)), dom(attr), attrdict[codom(attr)])
+        add_generator!(q, newhom)
+        # Attr(:v, ob, t) -> Attr(:v, g(ob), t) 
+        add_generator!(q, Attr(nameof(attr), attrdict[codom(attr)], codom(attr)))
+    end
+    return q
+end
+
+q = shunt(p)
+@acset_type NewType2(q)
+
+
+
+function Matrix(d::Dict{Symbol, Encoded})
+    hcat(getfield.(values(d), Ref(:encoded))...) 
+end
+
