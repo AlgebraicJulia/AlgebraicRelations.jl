@@ -45,10 +45,7 @@ JSON3 = "1.14.1"
 MLStyle = "0.4.17"
 MySQL = "1.4.7"
 OrderedCollections = "1.8.1"
-<<<<<<< HEAD
 PrettyTables = "2.4"
-=======
->>>>>>> 918e0bc (can request synthetic data)
 Reexport = "1.2.2"
 SQLite = "1.6.1"
 StructEquality = "2.1.0"
