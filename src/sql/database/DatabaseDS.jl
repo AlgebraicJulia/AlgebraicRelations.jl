@@ -21,9 +21,17 @@ using FunSQL: FROM, SELECT, WHERE, FUN
     # TODO needs to be consistent
     schema::Union{<:BasicSchema, <:Schemas.SQLSchema, Nothing} = nothing
     conn::FunSQL.SQLConnection{Conn}
+    types::Dict{Symbol,DataType} = Dict{Symbol,DataType}() 
     log::Vector{Log} = Log[]
 end
 export DBSource
+
+function DBSource(conn::Conn, data::ACSet) where Conn
+    funconn = FunSQL.DB(conn, catalog=FunSQL.reflect(conn))
+    schema = acset_schema(data)
+    types = Dict(col => type for (col, type) in zip(attrtypes(schema), [typeof(data).parameters...]))
+    DBSource{Conn}(schema=schema, conn=funconn, types=types)
+end
 
 function DBSource(conn::Conn, schema=nothing) where Conn
     funconn = FunSQL.DB(conn, catalog=FunSQL.reflect(conn))
@@ -56,7 +64,18 @@ Base.nameof(source::DBSource) = nothing
 # column => type
 function columntypes(source::DBSource)
     result = get_schema(source)
-    Dict(Symbol(row.column_name) => row.is_primary_key == 1 ? PK : from_sql(source, row.data_type) for row in eachrow(result))
+    s = acset_schema(source)
+    ats = attrs(s)
+    Dict(Symbol(row.column_name) => @match row begin
+        row && if row.is_primary_key == 1 end => PK
+        _ && if Symbol(row.column_name) ∈ getindex.(ats, Ref(1)) end => begin
+            attr, = ats[getindex.(ats, Ref(1)) .== Symbol(row.column_name)]
+            T = source.types[attr[3]]
+            T <: FK ? T : from_sql(source, row.data_type)
+        end
+        _ => from_sql(source, row.data_type)
+     end 
+     for row in eachrow(result))
 end
 
 # TODO could probably implement `isDML(::AbstractSQLTerm) = true` for types that are

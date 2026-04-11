@@ -1,5 +1,9 @@
 DenseACSets.acset_schema(m::InMemory) = acset_schema(m.value)
 
+function ACSetInterface.parts(m::InMemory, args...)
+    parts(m.value, args...)
+end
+
 function ACSetInterface.nparts(m::InMemory, args...)
     nparts(m.value, args...)
 end
