@@ -5,6 +5,7 @@ version = "0.3.1"
 
 [deps]
 ACSets = "227ef7b5-1206-438b-ac65-934d6da304b8"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 Catlab = "134e5e36-593f-5add-ad60-77f754baafbe"
 DBInterface = "a10d1c49-ce27-4219-8d33-6db1a4562965"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -36,6 +37,7 @@ SQLiteAlgRelExt = "SQLite"
 
 [compat]
 ACSets = "0.2.21"
+CSV = "0.10.16"
 Catlab = "0.16"
 DBInterface = "2.6.1"
 DataFrames = "1.0"
