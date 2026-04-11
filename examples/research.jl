@@ -360,7 +360,7 @@ q4 = @relation (ag=ag, kw=kw) begin
 end
 
 # Query 5 (complex, 9 boxes): "Full path from grant to journal field and keyword"
-q5 = @relation (jfield=jf, kw=kw, ag=ag, dname=dn) begin
+q5 = @relation (field=jf, keyword=kw, agency=ag, dept_name=dn) begin
     GrantDept(gd_grant=g, gd_dept=d)
     Grant(id=g, agency=ag)
     Department(id=d, dept_name=dn)
@@ -372,20 +372,11 @@ q5 = @relation (jfield=jf, kw=kw, ag=ag, dname=dn) begin
     Keyword(id=k, keyword=kw)
 end
 
-y = prepare(q5, fabric)
-
-lookup = y[2]
-_df = map(eachcol(y[1])) do col
-    # Journal.field, Keyword.keyword, Grant.ag, Department.dept_name
-    (Journal=lookup[:Journal][:field][col[1]],
-     Keyword=lookup[:Keyword][:keyword][col[2]],
-     Grant=lookup[:Grant][:agency][col[3]],
-     Department=lookup[:Department][:dept_name][col[4]])
-end
+q = prepare(q5, fabric)
 
 using DataFrames
 
-df=DataFrame(_df)
+df=DataFrame(q)
 
 q5_filtered = @relation (jfield=jf, kw=kw) begin
     GrantDept(gd_grant=g, gd_dept=d)
@@ -401,17 +392,9 @@ q5_filtered = @relation (jfield=jf, kw=kw) begin
     DeptFilter(dept_name=dept_name)
 end
 
-z = prepare(q5_filtered, fabric, filters=Dict(
+q_filtered = prepare(q5_filtered, fabric, filters=Dict(
     :agency => :NSF,
     :dept_name => :Mathematics,
 ))
 
-lookup = z[2]
-_df = map(eachcol(z[1])) do col
-    # Journal.field, Keyword.keyword, Grant.ag, Department.dept_name
-    (Journal=lookup[:Journal][:field][col[1]],
-     Keyword=lookup[:Keyword][:keyword][col[2]])
-     # Grant=lookup[:Grant][:agency][col[3]],
-     # Department=lookup[:Department][:dept_name][col[4]])
-end
-
+df=DataFrame(q)

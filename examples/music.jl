@@ -293,7 +293,7 @@ add_part!(fabric, :VenueArtist, va_venue=FK{VenueT}(3), va_artist=FK{ArtistT}(8)
 #   Portishead plays Rock, has Rock track (GloryBox)
 #   Portishead plays Electronic, has Electronic tracks (Wandering_Star)
 #
-q_cyclic = @relation (aname=an, gname=gn_name, tname=tn) begin
+q_cyclic = @relation (artist_name=an, genre_name=gn_name, track_name=tn) begin
     # filter first for early pruning
     CityFilter(city_name=city_name) # TODO need to safely handle when the portname is not given
     City(id=ct, city_name=city_name)  
@@ -310,41 +310,9 @@ q_cyclic = @relation (aname=an, gname=gn_name, tname=tn) begin
     Genre(id=gn, genre_name=gn_name)
 end
 
-y = prepare(q_cyclic, fabric, filters=Dict(:city_name=>:Berlin))
-
-lookup = y[2]
-_df = map(eachcol(y[1])) do col
-    # Journal.field, Keyword.keyword, Grant.ag, Department.dept_name
-    (Artist=lookup[:Artist][:artist_name][col[1]],
-     Genre=lookup[:Genre][:genre_name][col[2]],
-     Track=lookup[:Track][:track_name][col[3]])
-end
+# TODO make filters functions as in ACSet.jl Query module
 
 using DataFrames
 
-df=DataFrame(_df)
-
-# To run with London filter (city 1):
-# prepare(q_cyclic, fabric, filters=Dict(:CityFilter => [1;;]))
-
-# Query 2 (simple): "What tracks are on each album?"
-q_simple = @relation (aname=an, tname=tn) begin
-    ArtistAlbum(aa_artist=a, aa_album=al)
-    Track(id=t, tr_album=al)
-    Artist(id=a, artist_name=an)
-    Track(id=t, track_name=tn)
-end
-
-# Query 3 (star from track): "For a given track, find its genre,
-#   album, artist, and which venues the artist has played"
-q_star = @relation (tname=tn, gname=gn, aname=an, vname=vn) begin
-    TrackGenre(tg_track=t, tg_genre=g)
-    Track(id=t, tr_album=al, track_name=tn)
-    ArtistAlbum(aa_album=al, aa_artist=a)
-    VenueArtist(va_artist=a, va_venue=v)
-    Genre(id=g, genre_name=gn)
-    Artist(id=a, artist_name=an)
-    Venue(id=v, venue_name=vn)
-end
-
-
+q = prepare(q_cyclic, fabric, filters=Dict(:city => :Berlin))
+df=DataFrame(q)

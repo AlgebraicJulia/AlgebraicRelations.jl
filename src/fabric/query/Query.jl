@@ -53,6 +53,27 @@ end
 
 query_inputs(rel) = [subpart(rel, incident(rel, box, :box), :junction) for box in Catlab.boxes(rel)]
 
+
+struct QueryResult
+    rel::Catlab.WiringDiagrams.RelationDiagrams.UntypedNamedRelationDiagram
+    filters
+    result::Matrix{Int}
+    lookup::Dict{Symbol,Dict{Symbol,Encoded}}
+end
+
+import DataFrames: DataFrame
+
+function DataFrame(q::QueryResult)
+    # @info [subpart(q.rel, incident(q.rel, col, :port_name), [:box, :name])=>col for col in q.rel[:outer_port_name]]
+    names = [only(subpart(q.rel, incident(q.rel, col, :port_name), [:box, :name]))=>col for col in q.rel[:outer_port_name]]
+    named = [Symbol("$(name[1]).$(name[2])") for name in names]
+    out = map(eachcol(q.result)) do col
+        values = [q.lookup[box][field][col[idx]] for (idx, (box, field)) in enumerate(names)]
+        NamedTuple{Tuple(named)}(values)
+    end
+    DataFrame(out)
+end
+
 function prepare(rel, data::ACSet, lookup)
     attributes = first.(attrs(acset_schema(data)))
     homs = first.(ACSets.homs(acset_schema(data)))
@@ -133,7 +154,7 @@ function prepare(rel, fabric::DataFabric; filters=Dict())
     d = WD.WiringDiagram(s, outputs, dims) 
     a = WD.SpanAlgebra{Matrix{Int}}()
     result = a(d)([inputs[box] for box in Catlab.boxes(rel)]...)
-    (result, lookup)
+    QueryResult(rel, filters, result, lookup)
 end
 
 # TODO change Any to AbstractResult

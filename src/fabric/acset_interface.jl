@@ -23,6 +23,7 @@ function decide_source(fabric::DataFabric, attr::Pair{Symbol, Symbol})
     only(source)
 end
 
+# TODO add_parts!
 function add_part!(fabric::DataFabric, table::Symbol, args...)
     source = decide_source(fabric, :tname => table)
     add_part!(source, table, args...)
