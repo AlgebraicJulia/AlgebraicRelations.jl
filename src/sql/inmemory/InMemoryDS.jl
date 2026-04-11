@@ -4,8 +4,8 @@ using ACSets
 using TraitInterfaces
 using DataFrames
 
-using ..SQL: ThDataSource, AbstractDataSource
-import ..SQL: columntypes
+using ..SQL: ThDataSource, AbstractDataSource, Encoded
+import ..SQL: columntypes, encode_attr
 import ...AlgebraicRelations: trait
 
 # this is an ACSet
@@ -39,6 +39,28 @@ function columntypes(x::ACSet)
     Dict([name => attrtype_mapping[attrtype] for (name, _, attrtype) in acset_schema(x).attrs]...)
 end
 columntypes(m::InMemory) = columntypes(m.value)
+
+
+encode_attr(m::InMemory) = encode_attr(m.value)
+
+# TODO dispatch on generator
+function encode_attr(acset::ACSet)
+    s = acset_schema(acset)
+    as = attrs(s)
+    obs = objects(s)
+    ob_attrs = Dict(ob => first.(getindex(as, findall(x->x[2]==ob, as))) for ob in obs)
+    Dict(ob => Dict(attr => encode_attr(acset, attr) for attr in ob_attrs[ob]) for ob in obs) 
+end
+export encode_attr
+
+function encode_attr(acset::ACSet, attr::Symbol)
+    vals = acset[attr]
+    uniq = unique(vals)
+    lookup = Dict(v => i for (i, v) in enumerate(uniq))
+    encoded = [lookup[v] for v in vals]
+    return Encoded(length(uniq), encoded, uniq)
+end
+
 
 include("acset_interface.jl")
 

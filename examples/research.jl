@@ -372,29 +372,25 @@ q5 = @relation (field=jf, keyword=kw, agency=ag, dept_name=dn) begin
     Keyword(id=k, keyword=kw)
 end
 
-q = prepare(q5, fabric)
+q = q5(fabric)
+q
 
-using DataFrames
-
-df=DataFrame(q)
-
-q5_filtered = @relation (jfield=jf, kw=kw) begin
+q5_filtered = @relation (field=field, keyword=keyword) begin
     GrantDept(gd_grant=g, gd_dept=d)
     Grant(id=g, agency=agency)
     Department(id=d, dept_name=dept_name)
     ResearcherDept(rd_dept=d, rd_researcher=r)
     PaperAuthor(pa_researcher=r, pa_paper=p)
     PaperJournal(pj_paper=p, pj_journal=j)
-    Journal(id=j, field=jf)
+    Journal(id=j, field=field)
     PaperKeyword(pk_paper=p, pk_keyword=k)
-    Keyword(id=k, keyword=kw)
+    Keyword(id=k, keyword=keyword)
     AgencyFilter(agency=agency)
     DeptFilter(dept_name=dept_name)
 end
 
-q_filtered = prepare(q5_filtered, fabric, filters=Dict(
+q = q5_filtered(fabric, filters=Dict(
     :agency => :NSF,
     :dept_name => :Mathematics,
 ))
-
-df=DataFrame(q)
+q

@@ -1,80 +1,25 @@
-struct Encoded
-    size::Int
-    encoded::Vector{Int}
-    unique
-end
+module Query
 
-Base.getindex(encoded::Encoded, idx::Int) = encoded.unique[idx]
-Base.getindex(encoded::Encoded, idxs::Vector{Int}) = getindex.(Ref(encoded), idxs)
+import ...AlgebraicRelations.SQL: encode_attr, Encoded
+using ..Fabric: DataFabric, PK, FK
 
-function encode_attr(acset::ACSet, attr::Symbol)
-    vals = acset[attr]
-    uniq = unique(vals)
-    lookup = Dict(v => i for (i, v) in enumerate(uniq))
-    encoded = [lookup[v] for v in vals]
-    return Encoded(length(uniq), encoded, uniq)
-end
+using ACSets
+import Catlab
+import Catlab.WiringDiagrams.RelationDiagrams: UntypedNamedRelationDiagram as UNRD
+import WiringDiagrams as WD
 
-# TODO dispatch on generator
-function encode_attr(acset::ACSet)
-    s = acset_schema(acset)
-    as = attrs(s)
-    obs = objects(s)
-    ob_attrs = Dict(ob => first.(getindex(as, findall(x->x[2]==ob, as))) for ob in obs)
-    Dict(ob => Dict(attr => encode_attr(acset, attr) for attr in ob_attrs[ob]) for ob in obs) 
-end
-export encode_attr
-
-using ..SQL.InMemoryDS: InMemory 
-
-encode_attr(m::InMemory) = encode_attr(m.value)
-
-using ..SQL.DatabaseDS: DBSource
-
-# TODO encode_attr for db
-
-function encode_attr(acset::DBSource, attr::Symbol)
-    vals = subpart(acset,attr) # TODO formatter
-    vals = vals[!, attr]
-    uniq = unique(vals)
-    lookup = Dict(v => i for (i, v) in enumerate(uniq))
-    encoded = [lookup[v] for v in vals]
-    return Encoded(length(uniq), encoded, uniq)
-end
-
-function encode_attr(db::DBSource)
-    s = acset_schema(db)
-    as = attrs(s)
-    obs = objects(s)
-    ob_attrs = Dict(ob => first.(getindex(as, findall(x->x[2]==ob, as))) for ob in obs)
-    Dict(ob => Dict(attr => encode_attr(db, attr) for attr in ob_attrs[ob]) for ob in obs)
-end
-#
+using MLStyle: @match
 
 query_inputs(rel) = [subpart(rel, incident(rel, box, :box), :junction) for box in Catlab.boxes(rel)]
 
-
 struct QueryResult
-    rel::Catlab.WiringDiagrams.RelationDiagrams.UntypedNamedRelationDiagram
+    rel::UNRD
     filters
     result::Matrix{Int}
     lookup::Dict{Symbol,Dict{Symbol,Encoded}}
 end
 
-import DataFrames: DataFrame
-
-function DataFrame(q::QueryResult)
-    # @info [subpart(q.rel, incident(q.rel, col, :port_name), [:box, :name])=>col for col in q.rel[:outer_port_name]]
-    names = [only(subpart(q.rel, incident(q.rel, col, :port_name), [:box, :name]))=>col for col in q.rel[:outer_port_name]]
-    named = [Symbol("$(name[1]).$(name[2])") for name in names]
-    out = map(eachcol(q.result)) do col
-        values = [q.lookup[box][field][col[idx]] for (idx, (box, field)) in enumerate(names)]
-        NamedTuple{Tuple(named)}(values)
-    end
-    DataFrame(out)
-end
-
-function prepare(rel, data::ACSet, lookup)
+function Catlab.query(rel, data::ACSet, lookup)
     attributes = first.(attrs(acset_schema(data)))
     homs = first.(ACSets.homs(acset_schema(data)))
     outputs = subpart(rel, :outer_junction)
@@ -97,9 +42,8 @@ function prepare(rel, data::ACSet, lookup)
     a = SpanAlgebra{Matrix{Int}}()
     result = a(d)([inputs[box] for box in Catlab.boxes(rel)]...)
 end
-export prepare
 
-function prepare(rel, fabric::DataFabric; filters=Dict())
+function Catlab.query(rel::UNRD, fabric::DataFabric; filters=Dict())
     catalog = fabric.catalog
     tables = subpart(catalog, :tname)
     attributes = (From(:Column=>:cname)|>Where(:type, x->!(x == PK)&&!(x <: FK)))(catalog) |> only |> Base.Fix2(getindex, 2)
@@ -137,13 +81,8 @@ function prepare(rel, fabric::DataFabric; filters=Dict())
                 eltype(vals) <: FK ? getfield.(vals, Ref(:val)) : vals
             end
             _ => begin
-                # TODO implement parts for fabric
                 data, = subpart(fabric.graph, subpart(catalog, incident(catalog, boxname, :tname), :source), :value)
-                if data isa DBSource
-                    1:nparts(data,boxname)
-                else
-                    parts(data, boxname)
-                end
+                parts(data, boxname)
             end
         end
         values'
@@ -157,28 +96,49 @@ function prepare(rel, fabric::DataFabric; filters=Dict())
     QueryResult(rel, filters, result, lookup)
 end
 
+(q::UNRD)(fabric::DataFabric; kwargs...) = Catlab.query(q, fabric; kwargs...)
+
+import DataFrames: DataFrame
+
+function DataFrame(q::QueryResult)
+    # @info [subpart(q.rel, incident(q.rel, col, :port_name), [:box, :name])=>col for col in q.rel[:outer_port_name]]
+    names = [only(subpart(q.rel, incident(q.rel, col, :port_name), [:box, :name]))=>col for col in q.rel[:outer_port_name]]
+    named = [Symbol("$(name[1]).$(name[2])") for name in names]
+    out = map(eachcol(q.result)) do col
+        values = [q.lookup[box][field][col[idx]] for (idx, (box, field)) in enumerate(names)]
+        NamedTuple{Tuple(named)}(values)
+    end
+    DataFrame(out)
+end
+
+function Base.show(io::IO, q::QueryResult)
+    print(io, DataFrame(q))
+end
+
 # TODO change Any to AbstractResult
 
-QueryResultDSGraph = DataSourceGraph{Symbol, Union{DataFrame, Nothing}, Symbol}
+# QueryResultDSGraph = DataSourceGraph{Symbol, Union{DataFrame, Nothing}, Symbol}
 
-struct QueryResultWrapper
-    qg::QueryResultDSGraph
-    # query
-end
-export QueryResultWrapper
+# struct QueryResultWrapper
+#     qg::QueryResultDSGraph
+#     # query
+# end
+# export QueryResultWrapper
 
-function QueryResultWrapper(g::DataSourceGraph)
-    qg = QueryResultDSGraph()
-    add_parts!(qg, :V, nparts(g, :V), label=subpart(g, :label))
-    edges = parts(g, :E)
-    for e in edges
-        foot1 = subpart(g, e, :src)
-        foot2 = subpart(g, e, :tgt)
-        label1 = subpart(g, foot1, :label)
-        label2 = subpart(g, foot2, :label)
-        apex = add_part!(qg, :V, label=Symbol("$label1⨝$label2"))
-        add_parts!(qg, :E, 2, src=[apex, apex], tgt=[foot1, foot2], edgelabel=[label1, label2])
-    end
-    QueryResultWrapper(qg)
+# function QueryResultWrapper(g::DataSourceGraph)
+#     qg = QueryResultDSGraph()
+#     add_parts!(qg, :V, nparts(g, :V), label=subpart(g, :label))
+#     edges = parts(g, :E)
+#     for e in edges
+#         foot1 = subpart(g, e, :src)
+#         foot2 = subpart(g, e, :tgt)
+#         label1 = subpart(g, foot1, :label)
+#         label2 = subpart(g, foot2, :label)
+#         apex = add_part!(qg, :V, label=Symbol("$label1⨝$label2"))
+#         add_parts!(qg, :E, 2, src=[apex, apex], tgt=[foot1, foot2], edgelabel=[label1, label2])
+#     end
+#     QueryResultWrapper(qg)
+# end
+# export QueryResultWrapper
+
 end
-export QueryResultWrapper

@@ -9,4 +9,3 @@ struct Log
     Log(event::DataType) = new(Dates.now(), event)
 end
 export Log
-

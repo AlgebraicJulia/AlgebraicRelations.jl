@@ -2,10 +2,6 @@ using ACSets
 using Catlab
 using AlgebraicRelations
 
-using SQLite, DBInterface
-using FunSQL
-
-τ = AlgebraicRelations.SQL.DatabaseDS.DBSourceTrait()
 fabric = DataFabric()
 
 @present SchClimate(FreeSchema) begin
@@ -16,11 +12,6 @@ end
 @acset_type Climate(SchClimate)
 climate = InMemory(Climate{Symbol}())
 climate_src = add_source!(fabric, climate)
-# data
-add_part!(fabric, :Climate, climate_type=:Cool)
-add_part!(fabric, :Climate, climate_type=:Intermediate)
-add_part!(fabric, :Climate, climate_type=:Warm)
-add_part!(fabric, :Climate, climate_type=:Hot)
 
 @present SchGrape(FreeSchema) begin
     (Name, Climate)::AttrType
@@ -30,9 +21,6 @@ end
 @acset_type Grape(SchGrape)
 grape = InMemory(Grape{Symbol, FK{Climate}}())
 grape_src = add_source!(fabric, grape)
-#
-add_part!(fabric, :Grape, color=:Green, species=:GreenGrape)
-add_part!(fabric, :Grape, color=:Red, species=:RedGrape)
 
 @present SchClimateGrape(FreeSchema) begin
     (Grape, Climate)::AttrType
@@ -54,11 +42,6 @@ end
 @acset_type Country(SchCountry)
 country = InMemory(Country{Symbol}())
 country_src = add_source!(fabric, country)
-# data
-add_part!(fabric, :Country, country=:Italy)
-add_part!(fabric, :Country, country=:France)
-add_part!(fabric, :Country, country=:USA)
-add_part!(fabric, :Country, country=:NewZealand)
 
 @present SchCountryClimate(FreeSchema) begin
     (Name, Country, Climate)::AttrType
@@ -72,20 +55,17 @@ country_climate = InMemory(CountryClimate{Symbol, FK{Country}, FK{Climate}}())
 country_climate_src = add_source!(fabric, country_climate)
 add_fk!(fabric, country_climate_src, country_src, :CountryClimate!cc_country => :Country!Country_id)
 add_fk!(fabric, country_climate_src, climate_src, :CountryClimate!cc_climate => :Climate!Climate_id)
-# data
-add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Climate}(2), cc_region=:Sicily)
-# chardonnay, nero d'avola, marsalacc_
-add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Climate}(2), cc_region=:Calabria)
-# gaglioppo, greco bianco
-add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Climate}(2), cc_region=:Puglia)
-# sangiovese, montepulciano, trebbicc_ano
-add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Climate}(2), cc_region=:Tuscany)
-# sangiovese, merlot, trebbiano
-add_part!(fabric, :CountryClimate, cc_country=FK{Country}(1), cc_climate=FK{Climate}(2), cc_region=:Piedmont)
-# nebbiolo, moscato d'asti
-add_part!(fabric, :CountryClimate, cc_country=FK{Country}(3), cc_climate=FK{Climate}(3), cc_region=:NapaValley)
-add_part!(fabric, :CountryClimate, cc_country=FK{Country}(3), cc_climate=FK{Climate}(1), cc_region=:WillametteValley)
-add_part!(fabric, :CountryClimate, cc_country=FK{Country}(3), cc_climate=FK{Climate}(2), cc_region=:Sonoma)
+
+ingest_csv!(fabric, :Climate, "examples/simpler-wineries/Climate.csv")
+ingest_csv!(fabric, :Grape, "examples/simpler-wineries/Grape.csv")
+ingest_csv!(fabric, :Country, "examples/simpler-wineries/Country.csv")
+
+# junction tables — specify which columns are FKs
+ingest_csv!(fabric, :ClimateGrape, "examples/simpler-wineries/ClimateGrape.csv")
+    # fk_types=Dict(:cg_grape => Grape, :cg_climate => Climate))
+
+ingest_csv!(fabric, :CountryClimate, "examples/simpler-wineries/CountryClimate.csv")
+    # fk_types=Dict(:cc_country => Country, :cc_climate => Climate))
 
 _d = @relation (country=co, region=region) begin
     CountryClimate(cc_country=co, cc_region=region)

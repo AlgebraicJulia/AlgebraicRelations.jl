@@ -1,7 +1,7 @@
 module DatabaseDS
 
-using ..SQL: AbstractDataSource, ThDatabase, ThDataSource, Syntax, Schemas
-import ..SQL: columntypes
+using ..SQL: AbstractDataSource, ThDatabase, ThDataSource, Syntax, Schemas, Encoded
+import ..SQL: columntypes, encode_attr
 using ...AlgebraicRelations
 using ...AlgebraicRelations: Log
 
@@ -90,6 +90,23 @@ end
 #     formatter(result)
 # end
 # export execute!
+
+function encode_attr(acset::DBSource, attr::Symbol)
+    vals = subpart(acset,attr) # TODO formatter
+    vals = vals[!, attr] # ^ TODO because this returns data frame
+    uniq = unique(vals)
+    lookup = Dict(v => i for (i, v) in enumerate(uniq))
+    encoded = [lookup[v] for v in vals]
+    return Encoded(length(uniq), encoded, uniq)
+end
+
+function encode_attr(db::DBSource)
+    s = acset_schema(db)
+    as = attrs(s)
+    obs = objects(s)
+    ob_attrs = Dict(ob => first.(getindex(as, findall(x->x[2]==ob, as))) for ob in obs)
+    Dict(ob => Dict(attr => encode_attr(db, attr) for attr in ob_attrs[ob]) for ob in obs)
+end
 
 DenseACSets.acset_schema(db::DBSource) = db.schema
 

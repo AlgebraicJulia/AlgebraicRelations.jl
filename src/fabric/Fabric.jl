@@ -16,7 +16,6 @@ import ...AlgebraicRelations: trait
 using Catlab
 using Catlab.Graphics.Graphviz
 using ACSets
-import WiringDiagrams as WD
 
 using TraitInterfaces: @instance
 
@@ -44,6 +43,8 @@ export get_sqlite_schema
     val::Int
 end
 export FK
+
+Base.convert(::Type{FK{T}}, id::Int) where T = FK{T}(id)
 
 function from_sql end
 export from_sql
@@ -209,7 +210,6 @@ function add_fk!(fabric::DataFabric, src::Int, tgt::Int, elabel::Pair{Symbol, Sy
 end
 export add_fk!
 
-
 # Executing commands on data fabric
 
 """ """
@@ -219,10 +219,13 @@ export render
 # ACSet Interface for the Fabric. It determines which data source to dispatch the ACSet function on
 include("acset_interface.jl")
 include("query/Query.jl")
-include("queryplanning.jl")
+
+# ingestion
+include("ingestion.jl")
 
 # Custom show methods for Fabric objects
 include("show.jl")
 
+@reexport using .Query
 
 end

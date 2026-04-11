@@ -88,7 +88,6 @@ end
 function FunSQL.render(source::DBSource{MySQL.Connection}, u::Update) 
     cols = join(columns(u.values), ", ")
     wheres = !isnothing(u.wheres) ? render(source, u.wheres) : ""
-    @info wheres
     "UPDATE $(u.table) SET $(sql(source, u.values)) " * wheres * ";"
 end
 

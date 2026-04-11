@@ -54,6 +54,9 @@ include("Schemas.jl")
 function columntypes end
 export columntypes
 
+function encode_attr end
+export encode_attr
+
 # DATA SOURCES
 
 # TODO derive as a trait
@@ -75,6 +78,15 @@ export AbstractDataSource
 
 get_schema(::AbstractDataSource) = []
 export get_schema
+
+struct Encoded
+    size::Int
+    encoded::Vector{Int}
+    unique
+end
+
+Base.getindex(encoded::Encoded, idx::Int) = encoded.unique[idx]
+Base.getindex(encoded::Encoded, idxs::Vector{Int}) = getindex.(Ref(encoded), idxs)
 
 include("database/DatabaseDS.jl")
 include("inmemory/InMemoryDS.jl")

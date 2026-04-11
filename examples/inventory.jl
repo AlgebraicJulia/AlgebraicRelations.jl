@@ -5,6 +5,8 @@ using AlgebraicRelations
 using SQLite, DBInterface
 using FunSQL
 
+using DataFrames
+
 τ = AlgebraicRelations.SQL.DatabaseDS.DBSourceTrait()
 fabric = DataFabric()
 
@@ -586,5 +588,5 @@ q_local_supply = @relation (
     Product(id=p, product_name=pn)
 end
 
-q = prepare(q_local_supply, fabric, filters=Dict(:region_name => :Midwest))
-df = DataFrame(q)
+q = q_local_supply(fabric, filters=Dict(:region_name => :Midwest))
+q

@@ -297,7 +297,7 @@ q_cyclic = @relation (artist_name=an, genre_name=gn_name, track_name=tn) begin
     # filter first for early pruning
     CityFilter(city_name=city_name) # TODO need to safely handle when the portname is not given
     City(id=ct, city_name=city_name)  
-    Venue(id=v, ve_city=ct) # TODO add a city ref table
+    Venue(id=v, ve_city=ct) 
     VenueArtist(va_venue=v, va_artist=a)
     # artist-genre link
     ArtistGenre(ag_artist=a, ag_genre=gn)
@@ -312,7 +312,5 @@ end
 
 # TODO make filters functions as in ACSet.jl Query module
 
-using DataFrames
-
-q = prepare(q_cyclic, fabric, filters=Dict(:city => :Berlin))
-df=DataFrame(q)
+q = q_cyclic(fabric, filters=Dict(:city_name => :Berlin))
+q

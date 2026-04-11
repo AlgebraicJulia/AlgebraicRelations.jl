@@ -582,11 +582,8 @@ q_domestic = @relation (
     Pilot(id=pl, pilot_name=pln)
 end
 
-using DataFrames
-
-# To run:
-@time q = prepare(q_domestic, fabric, filters=Dict(:country_name => :UnitedStates))
-df = DataFrame(q)
+q = q_domestic(fabric, filters=Dict(:country_name => :China))
+q
 
 # Simpler query: "What cargo types were loaded at each port?"
 # q_cargo_by_port = @relation (port_name=ptn, cargo_type_name=ctn) begin

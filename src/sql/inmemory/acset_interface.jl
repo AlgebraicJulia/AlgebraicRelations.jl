@@ -8,12 +8,12 @@ function ACSetInterface.nparts(m::InMemory, args...)
     nparts(m.value, args...)
 end
 
-function ACSetInterface.add_part!(m::InMemory, args...)
-    add_part!(m.value, args...)
+function ACSetInterface.add_part!(m::InMemory, args...; kwargs...)
+    add_part!(m.value, args...;  kwargs...)
 end
 
-function ACSetInterface.add_parts!(m::InMemory, args...)
-    add_parts!(m.value, args...)
+function ACSetInterface.add_parts!(m::InMemory, args...; kwargs...)
+    add_parts!(m.value, args...; kwargs...)
 end
 
 function ACSetInterface.subpart(m::InMemory, id, tablecolumn::Pair{Symbol, Symbol})
