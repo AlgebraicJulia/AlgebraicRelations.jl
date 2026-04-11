@@ -2,7 +2,11 @@
 # # ACSets Interface
 # ####################
 
-import Catlab.ACSetInterface: nparts, maxpart, subpart, incident, add_part!, set_subpart!, clear_subpart!, rem_part!, rem_parts!, cascading_rem_part1
+import Catlab.ACSetInterface: nparts, maxpart, subpart, incident, add_part!, set_subpart!, clear_subpart!, rem_part!, rem_parts!, cascading_rem_part1, parts
+
+function parts(db::DBSource, table::Symbol; formatter=identity)
+    1:nparts(db, table)
+end
 
 # get the number of rows
 # TODO incorporate formatter

@@ -16,6 +16,7 @@ import ...AlgebraicRelations: trait
 using Catlab
 using Catlab.Graphics.Graphviz
 using ACSets
+import WiringDiagrams as WD
 
 using TraitInterfaces: @instance
 
@@ -95,13 +96,11 @@ export view_graphviz
 using TraitInterfaces
 import Catlab: ACSet
 
-include("query/Query.jl")
-
 @kwdef mutable struct DataFabric
     # this will store the connections, their schema, and values
     graph::DataSourceGraph = DataSourceGraph()
     catalog::Catalog = Catalog()
-    queries::Vector{QueryResultWrapper} = QueryResultWrapper[]
+    # queries::Vector{QueryResultWrapper} = QueryResultWrapper[]
     log::Vector{Log} = Log[]
 end
 export DataFabric
@@ -219,6 +218,7 @@ export render
 
 # ACSet Interface for the Fabric. It determines which data source to dispatch the ACSet function on
 include("acset_interface.jl")
+include("query/Query.jl")
 include("queryplanning.jl")
 
 # Custom show methods for Fabric objects
