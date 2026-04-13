@@ -1,8 +1,10 @@
 module WebAPIDS
 
-using ..Fabric
-
 using ACSets
+using TraitInterfaces
+
+using ..SQL: ThDataSource, AbstractDataSource
+import ...AlgebraicRelations: trait
 
 using HTTP
 using Gumbo # HTML Parsing
@@ -41,11 +43,14 @@ function connect(string::String)
 end
 export connect
 
+# struct CachedData
+# end
+
 @kwdef mutable struct WebAPI <: AbstractDataSource
     const conn::WebAPIConnection # HTTP endpoint
     paths::Dict{Symbol, String} = Dict{Symbol, String}()
     token_envar::Union{String, Nothing} = nothing
-    log::Vector{Log} = Log[] 
+    # log::Vector{Log} = Log[] 
 end
 export WebAPI
 
@@ -85,9 +90,13 @@ end
 
 # TODO convert FunSQL into Query Parameters
 
-function Fabric.reconnect!(::WebAPI) end
+struct WebAPITrait end
+trait(::WebAPI) = WebAPITrait()
 
-function Fabric.execute!(webapi::WebAPI, stmt::AbstractString; formatter=nothing)
+TraitInterfaces.@instance ThDataSource{Source=WebAPI,Statement=AbstractString} [model::WebAPITrait] begin
+    reconnect!(m::WebAPI)::WebAPI = m
+    execute!(w::WebAPI, stmt::AbstractString)::Vector{Int} = Int[]
+    schema(w::WebAPI) = DenseACSets.acset_schema()
 end
 
 include("acset_interface.jl")
