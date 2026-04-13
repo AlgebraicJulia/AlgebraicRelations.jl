@@ -78,10 +78,10 @@ export get_schema
 
 include("database/DatabaseDS.jl")
 include("inmemory/InMemoryDS.jl")
-
-# include("WebApiDS.jl")
+include("webapi/WebApiDS.jl")
 
 @reexport using .DatabaseDS
 @reexport using .InMemoryDS
+@reexport using .WebAPIDS
 
 end

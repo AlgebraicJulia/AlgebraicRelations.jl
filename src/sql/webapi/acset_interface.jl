@@ -49,7 +49,7 @@ end
 #
 function ACSetInterface.subpart(web::WebAPI, name::Symbol; formatter=identity)
     headers = build_headers(web)
-    push!(web.log, Log(Dates.now(), "Called $(web.conn.endpoint) for $name"))
+    # push!(web.log, Log(Dates.now(), "Called $(web.conn.endpoint) for $name"))
     response = isnothing(headers) ? HTTP.request("GET", web.conn.endpoint) : HTTP.request("GET", web.conn.endpoint, headers)
     @assert response.status == 200
     parsed_doc = parsehtml(String(response.body))

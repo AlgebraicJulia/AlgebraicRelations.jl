@@ -27,7 +27,7 @@ trait(::InMemory) = InMemoryTrait()
 TraitInterfaces.@instance ThDataSource{Source=InMemory,Statement=AbstractString} [model::InMemoryTrait] begin 
     reconnect!(m::InMemory)::InMemory = m
     execute!(m::InMemory, stmt::AbstractString)::Vector{Int} = Int[]
-    schema(m::InMemory) = DenseACSets.acset_schema(value)
+    schema(m::InMemory) = DenseACSets.acset_schema(m.value)
 end
 
 Base.nameof(m::InMemory) = nameof(typeof(m.value))
