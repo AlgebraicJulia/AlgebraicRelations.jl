@@ -124,14 +124,7 @@ function prepare(rel, fabric::DataFabric; filters=Dict())
                 out = [findfirst(lookup[col_box][col].unique .== val) for val in ACSets.Query.iterable(filters[col])]
                 out
             end
-            (_, _) && if col ∈ attributes end => begin
-                if box ∉ keys(lookup)
-                    data, = subpart(fabric.graph, subpart(catalog, incident(catalog, boxname, :tname), :source), :value)
-                    encoded = encode_attr(data)
-                    lookup[boxname] = encoded[boxname]
-                end
-                lookup[boxname][col].encoded
-            end
+            (_, _) && if col ∈ attributes end => lookup[boxname][col].encoded
             (_, _) && if col ∈ homs end => begin
                 vals = subpart(fabric, col)
                 eltype(vals) <: FK ? getfield.(vals, Ref(:val)) : vals
