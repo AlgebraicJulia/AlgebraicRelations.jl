@@ -8,7 +8,7 @@ using FunSQL
 τ = AlgebraicRelations.SQL.DatabaseDS.DBSourceTrait()
 fabric = DataFabric()
 
-@present SchClimate(FreeSchema) begin
+@present SchClimate(FreeDoubleSchema) begin
     Name::AttrType
     Climate::Ob
     climate_type::Attr(Climate, Name)
