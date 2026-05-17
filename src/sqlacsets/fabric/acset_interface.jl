@@ -1,5 +1,9 @@
 # ACSet Interface
 
+struct MissingFabric <: Exception end
+
+Base.showerror(io, ::MissingFabric) = println(io, "Catalog not defined. Run `reflect!` on your fabric")
+
 # TODO refactor to use graph
 function decide_source(fabric::DataFabric, attr::Pair{Symbol, Tuple{Symbol, Symbol}})
     id = incident(fabric.catalog, attr.second[1], attr.first)
@@ -8,6 +12,7 @@ function decide_source(fabric::DataFabric, attr::Pair{Symbol, Tuple{Symbol, Symb
 end
 
 function decide_source(fabric::DataFabric, attr::Pair{Symbol, Symbol})
+    !isnothing(fabric.catalog) || throw(MissingFabric()) 
     id = incident(fabric.catalog, attr.second, attr.first)
     if attr.first == :cname
         id = subpart(fabric.catalog, id, :table)
